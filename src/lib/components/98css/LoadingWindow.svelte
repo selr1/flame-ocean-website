@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { get } from 'svelte/store';
 	import { debugMode, debugAnimationComplete } from '$lib/stores';
 	import WindowBody from './WindowBody.svelte';
 	import StatusBar from './StatusBar.svelte';
@@ -29,8 +28,11 @@
 		statusFields
 	}: Props = $props();
 
-	// Subscribe to global debug mode store using derived for proper reactivity
-	let debug = $derived.by(() => get(debugMode));
+	// Subscribe to global debug mode store using state for proper reactivity
+	let debug = $state(false);
+	debugMode.subscribe((value) => {
+		debug = value;
+	});
 
 	// Debug mode: animate progress over 10 seconds
 	let displayedProgress = $state(0);

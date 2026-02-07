@@ -81,9 +81,18 @@
   let dropZone: HTMLDivElement;
   let isDragOver = $state(false);
 
-  // Debug mode tracking
-  let debug = $derived.by(() => get(debugMode));
-  let debugAnimComplete = $derived.by(() => get(debugAnimationComplete));
+  // Debug mode tracking - use state with subscribe for proper reactivity
+  let debug = $state(false);
+  let debugAnimComplete = $state(true);
+
+  // Subscribe to stores
+  debugMode.subscribe((value) => {
+    debug = value;
+  });
+  debugAnimationComplete.subscribe((value) => {
+    debugAnimComplete = value;
+  });
+
   let showLoadingWindow = $derived(
     isProcessing || (debug && !debugAnimComplete),
   );
@@ -609,7 +618,6 @@
   }
 
   .tree-panel {
-    padding: 8px;
     overflow-y: auto;
     box-sizing: border-box;
   }
