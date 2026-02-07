@@ -140,6 +140,11 @@
 </ul>
 
 <style>
+	.tree-view {
+		max-height: 100%;
+		overflow-y: auto;
+	}
+
 	.leaf-node {
 		cursor: pointer;
 		padding: 2px 4px;

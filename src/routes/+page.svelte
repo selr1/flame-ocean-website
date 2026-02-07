@@ -622,6 +622,7 @@
 
   .tree-panel {
     max-height: 100%;
+    overflow-y: auto;
     box-sizing: border-box;
   }
 
