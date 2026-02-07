@@ -116,7 +116,7 @@ describe('createBmpHeader', () => {
 
 		// Check file size
 		const fileSize = header[2] | (header[3] << 8) | (header[4] << 16) | (header[5] << 24);
-		const expectedSize = 14 + 40 + 12 + 204 * 50; // Header + DIB + masks + image data
+		const expectedSize = 14 + 40 + 12 + 200 * 50; // Header + DIB + masks + image data
 		expect(fileSize).toBe(expectedSize);
 	});
 

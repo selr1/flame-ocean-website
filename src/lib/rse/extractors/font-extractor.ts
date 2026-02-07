@@ -118,7 +118,7 @@ export class FontExtractor {
 			}
 
 			const rowBits: boolean[] = [];
-			for (let bit = 15; bit >= 0; bit--) {
+			for (let bit = 15; bit > 0; bit--) {
 				rowBits.push(((finalPixel >> bit) & 1) === 1);
 			}
 			pixels.push(rowBits);

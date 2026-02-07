@@ -111,9 +111,9 @@ describe('BinaryReader', () => {
 		});
 
 		it('should handle mixed formats', () => {
-			const data = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+			const data = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef]);
 			const result = unpack(data, 0, ['H', 'I', 'H']);
-			expect(result).toEqual([0x3412, 0x78563490, 0xab]);
+			expect(result).toEqual([0x3412, 2878371926, 0xefcd]);
 		});
 	});
 

@@ -167,10 +167,12 @@ describe('isValidFontData', () => {
 		for (let y = 0; y < 16; y++) {
 			const row: boolean[] = [];
 			for (let x = 0; x < 15; x++) {
-				row.push(x === 0); // Only first pixel set
+				row.push(false); // No pixels set
 			}
 			pixels.push(row);
 		}
+		// Set only 1 pixel total (1/240 = 0.42% < 1% threshold)
+		pixels[0][0] = true;
 
 		expect(isValidFontData(pixels, 'SMALL')).toBe(false);
 		expect(isValidFontData(pixels, 'LARGE')).toBe(false);
