@@ -14,3 +14,4 @@ export { default as Tabs } from './Tabs.svelte';
 export { default as TableView } from './TableView.svelte';
 export { default as ProgressBar } from './ProgressBar.svelte';
 export { default as FieldBorder } from './FieldBorder.svelte';
+export { default as LoadingWindow } from './LoadingWindow.svelte';

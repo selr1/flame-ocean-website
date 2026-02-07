@@ -6,7 +6,8 @@
 		TreeView,
 		Button,
 		ProgressBar,
-		StatusBar
+		StatusBar,
+		LoadingWindow
 	} from '$lib/components/98css';
 	import FontGridRenderer from '$lib/components/firmware/FontGridRenderer.svelte';
 	import ImageRenderer from '$lib/components/firmware/ImageRenderer.svelte';
@@ -56,6 +57,7 @@
 	// File input
 	let fileInput: HTMLInputElement;
 	let dropZone: HTMLDivElement;
+	let isDragOver = $state(false);
 
 	// Initialize worker
 	onMount(() => {
@@ -322,16 +324,19 @@
 	// Drag and drop handlers
 	function handleDragOver(e: DragEvent) {
 		e.preventDefault();
+		isDragOver = true;
 		dropZone.classList.add('drag-over');
 	}
 
 	function handleDragLeave(e: DragEvent) {
 		e.preventDefault();
+		isDragOver = false;
 		dropZone.classList.remove('drag-over');
 	}
 
 	async function handleDrop(e: DragEvent) {
 		e.preventDefault();
+		isDragOver = false;
 		dropZone.classList.remove('drag-over');
 
 		const file = e.dataTransfer?.files[0];
@@ -346,47 +351,47 @@
 	}
 </script>
 
-<div class="container">
-	<h1>Firmware Browser</h1>
-	<p>Drag and drop a firmware file or click to browse</p>
+<div class="page-container">
+	<!-- Drop Zone Window -->
+	<Window title="Firmware Browser" width="500px">
+		<WindowBody>
+			<div
+				bind:this={dropZone}
+				class="drop-zone"
+				ondragover={handleDragOver}
+				ondragleave={handleDragLeave}
+				ondrop={handleDrop}
+				onclick={triggerFileInput}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						triggerFileInput();
+					}
+				}}
+				role="button"
+				tabindex="0"
+			>
+				<input type="file" bind:this={fileInput} hidden onchange={handleFileSelect} />
+				<div class="drop-zone-content">
+					{#if !firmwareData}
+						<img
+							src={isDragOver ? '/folder-drag-accept.png' : '/folder.png'}
+							alt="Folder"
+							class="folder-icon"
+						/>
+						<div class="drop-text">Drop firmware file here or click to browse</div>
+					{:else}
+						<img src="/folder.png" alt="Folder" class="folder-icon" />
+						<div class="drop-text">Firmware loaded! Click to load a different file</div>
+					{/if}
+				</div>
+			</div>
+		</WindowBody>
+	</Window>
 
-	<!-- Drop Zone -->
-	<div
-		bind:this={dropZone}
-		class="drop-zone"
-		ondragover={handleDragOver}
-		ondragleave={handleDragLeave}
-		ondrop={handleDrop}
-		onclick={triggerFileInput}
-		onkeydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				triggerFileInput();
-			}
-		}}
-		role="button"
-		tabindex="0"
-	>
-		<input type="file" bind:this={fileInput} hidden onchange={handleFileSelect} />
-		<div class="drop-zone-content">
-			{#if !firmwareData}
-				<div class="drop-icon">📁</div>
-				<div class="drop-text">Drop firmware file here or click to browse</div>
-			{:else}
-				<div class="drop-icon">✅</div>
-				<div class="drop-text">Firmware loaded! Click to load a different file</div>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Progress Bar -->
+	<!-- Loading Window -->
 	{#if isProcessing}
-		<Window title="Processing" width="600px">
-			<WindowBody>
-				<ProgressBar value={progress} />
-				<p>{statusMessage}</p>
-			</WindowBody>
-		</Window>
+		<LoadingWindow title="Processing" message={statusMessage} progress={progress} />
 	{/if}
 
 	<!-- Main Browser Interface -->
@@ -448,36 +453,35 @@
 </div>
 
 <style>
-	.container {
+	.page-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 100vh;
 		padding: 20px;
-		max-width: 1600px;
-		margin: 0 auto;
 		font-family: 'Tahoma', sans-serif;
 	}
 
-	h1 {
-		font-size: 24px;
-		margin-bottom: 10px;
-	}
-
-	p {
-		margin: 8px 0;
+	:global(.window) {
+		margin: 0 auto;
 	}
 
 	.drop-zone {
-		margin: 20px 0;
 		padding: 40px;
-		border: 3px dashed #808080;
-		background-color: #c0c0c0;
+		border: 2px inset #808080;
+		background-color: #ffffff;
 		text-align: center;
 		cursor: pointer;
-		transition: background-color 0.2s;
 	}
 
-	.drop-zone:hover,
+	.drop-zone:hover {
+		background-color: #eeeeee;
+	}
+
 	.drop-zone :global(.drag-over) {
-		background-color: #d0d0d0;
-		border-color: #000080;
+		border: 2px inset #000080;
+		background-color: #e0e0ff;
 	}
 
 	.drop-zone-content {
@@ -487,8 +491,10 @@
 		gap: 10px;
 	}
 
-	.drop-icon {
-		font-size: 48px;
+	.folder-icon {
+		width: 64px;
+		height: 64px;
+		image-rendering: pixelated;
 	}
 
 	.drop-text {
