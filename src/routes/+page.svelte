@@ -44,7 +44,7 @@
 	let statusMessage = $state('Ready to load firmware');
 	let selectedNode = $state<TreeNode | null>(null);
 	let selectedNodeIds = $state(new Set<string>());
-	let expandedNodes = $state(new Set<string>(['fonts', 'images']));
+	let expandedNodes = $state(new Set<string>());
 	let treeNodes = $state<TreeNode[]>([]);
 	let imageList = $state<BitmapFileInfo[]>([]);
 	let planeData = $state<{ name: string; start: number; end: number; fonts: Array<{ unicode: number; fontType: 'SMALL' | 'LARGE'; pixels: boolean[][] }> } | null>(null);
