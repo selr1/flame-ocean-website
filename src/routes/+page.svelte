@@ -43,6 +43,7 @@
 	let progress = $state(0);
 	let statusMessage = $state('Ready to load firmware');
 	let selectedNode = $state<TreeNode | null>(null);
+	let selectedNodeIds = $state(new Set<string>());
 	let expandedNodes = $state(new Set<string>(['fonts', 'images']));
 	let treeNodes = $state<TreeNode[]>([]);
 	let imageList = $state<BitmapFileInfo[]>([]);
@@ -64,6 +65,7 @@
 				if (id === 'analyze') {
 					// After analysis, list planes and images
 					statusMessage = 'Firmware analyzed. Loading resources...';
+					isProcessing = false;
 					loadResources();
 				} else if (id === 'listPlanes') {
 					const planes = result as FontPlaneInfo[];
@@ -172,12 +174,23 @@
 
 	// Handle tree node click
 	function handleNodeClick(node: TreeNode) {
+		if (isProcessing) return; // Don't allow new selection while processing
+
+		// Clear old data first to avoid showing stale content
+		planeData = null;
+		imageData = null;
+
 		selectedNode = node;
 
 		if (node.type === 'plane' && node.data) {
 			loadPlane(node.data as FontPlaneInfo);
 		} else if (node.type === 'image' && node.data) {
-			loadImage(node.data as BitmapFileInfo & { offset: number });
+			const image = node.data as BitmapFileInfo;
+			if (image.offset === undefined) {
+				statusMessage = `Error: Image ${image.name} has no offset information`;
+				return;
+			}
+			loadImage(image);
 		}
 	}
 
@@ -197,6 +210,7 @@
 	function handleSelectNode(nodeId: string) {
 		const node = findNodeById(treeNodes, nodeId);
 		if (node) {
+			selectedNodeIds = new Set([nodeId]);
 			handleNodeClick(node);
 		}
 	}
@@ -220,7 +234,7 @@
 	}
 
 	// Load image
-	function loadImage(image: BitmapFileInfo & { offset: number }) {
+	function loadImage(image: BitmapFileInfo) {
 		if (!worker || !firmwareData || isProcessing) return;
 
 		isProcessing = true;
@@ -234,7 +248,7 @@
 			imageName: image.name,
 			width: image.width,
 			height: image.height,
-			offset: image.offset!
+			offset: image.offset
 		});
 	}
 
@@ -352,6 +366,7 @@
 					<TreeView
 						nodes={treeNodes}
 						expanded={expandedNodes}
+						selected={selectedNodeIds}
 						onSelect={(nodeId) => handleSelectNode(nodeId)}
 					/>
 				</WindowBody>
@@ -361,7 +376,11 @@
 			<Window title="Resource Browser" class="browser-window">
 				<WindowBody>
 					{#if selectedNode}
-						{#if selectedNode.type === 'plane' && planeData}
+						{#if isProcessing}
+							<div class="empty-state">
+								<p>Loading {selectedNode.type}...</p>
+							</div>
+						{:else if selectedNode.type === 'plane' && planeData}
 							<div class="plane-header">
 								<h2>{planeData.name}</h2>
 								<p>U+{planeData.start.toString(16).toUpperCase()} - U+{planeData.end.toString(16).toUpperCase()}</p>
@@ -376,6 +395,10 @@
 								rgb565Data={imageData.rgb565Data}
 								zoom={2}
 							/>
+						{:else}
+							<div class="empty-state">
+								<p>No data available for this resource</p>
+							</div>
 						{/if}
 					{:else}
 						<div class="empty-state">
