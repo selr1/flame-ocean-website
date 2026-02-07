@@ -5,8 +5,6 @@
     Window,
     WindowBody,
     TreeView,
-    Button,
-    ProgressBar,
     StatusBar,
     LoadingWindow,
   } from "$lib/components/98css";
@@ -175,7 +173,7 @@
       .filter((p) => p.smallCount > 0)
       .map((plane) => ({
         id: `plane-small-${plane.name}`,
-        label: `${plane.name} (${plane.smallCount})`,
+        label: `${plane.name}`,
         type: "plane" as const,
         data: { ...plane, fontType: "SMALL" as const },
         children: [],
