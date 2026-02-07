@@ -1,272 +1,399 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
-		Button,
-		Checkbox,
-		Radio,
-		GroupBox,
-		TextBox,
-		Slider,
-		Dropdown,
 		Window,
 		WindowBody,
 		TreeView,
-		Tabs,
-		TableView,
+		Button,
 		ProgressBar,
-		FieldBorder
+		StatusBar
 	} from '$lib/components/98css';
+	import FontGridRenderer from '$lib/components/firmware/FontGridRenderer.svelte';
+	import ImageRenderer from '$lib/components/firmware/ImageRenderer.svelte';
 
-	// Form state
-	let buttonText = $state('Click me');
-	let checked = $state(false);
-	let radio1 = $state(true);
-	let radio2 = $state(false);
-	let radioDiners = $state(true);
-	let radioDriveIns = $state(false);
-	let radioDives = $state(false);
-	let textField = $state('');
-	let textAreaValue = $state('');
-	let sliderValue = $state(5);
-	let dropdownValue = $state('3');
-	let selectedTab = $state('desktop');
-	let selectedTableRow = $state<string | null>(null);
-	let progress = $state(40);
+	// Types
+	interface FontPlaneInfo {
+		name: string;
+		start: number;
+		end: number;
+		estimatedCount: number;
+	}
 
-	// TreeView data
-	const treeNodes = [
-		{
-			id: 'css',
-			label: 'CSS',
-			children: [
-				{ id: 'selectors', label: 'Selectors' },
-				{ id: 'specificity', label: 'Specificity' },
-				{ id: 'properties', label: 'Properties' }
-			]
-		},
-		{
-			id: 'javascript',
-			label: 'JavaScript',
-			children: [
-				{
-					id: 'avoid',
-					label: 'Avoid at all costs',
-					children: [
-						{ id: 'unless', label: 'Unless' },
-						{
-							id: 'nested',
-							label: 'Nested',
-							children: [
-								{ id: 'deep1', label: 'Deep 1' },
-								{ id: 'deep2', label: 'Deep 2' }
-							]
-						}
-					]
+	interface BitmapFileInfo {
+		name: string;
+		width: number;
+		height: number;
+		size: number;
+		offset?: number;
+	}
+
+	interface TreeNode {
+		id: string;
+		label: string;
+		type: 'folder' | 'plane' | 'image';
+		data?: FontPlaneInfo | BitmapFileInfo;
+		children?: TreeNode[];
+	}
+
+	// State
+	let firmwareData = $state<Uint8Array | null>(null);
+	let worker: Worker | null = null;
+	let isProcessing = $state(false);
+	let progress = $state(0);
+	let statusMessage = $state('Ready to load firmware');
+	let selectedNode = $state<TreeNode | null>(null);
+	let expandedNodes = $state(new Set<string>(['fonts', 'images']));
+	let treeNodes = $state<TreeNode[]>([]);
+	let imageList = $state<BitmapFileInfo[]>([]);
+	let planeData = $state<{ name: string; start: number; end: number; fonts: Array<{ unicode: number; fontType: 'SMALL' | 'LARGE'; pixels: boolean[][] }> } | null>(null);
+	let imageData = $state<{ name: string; width: number; height: number; rgb565Data: Uint8Array } | null>(null);
+
+	// File input
+	let fileInput: HTMLInputElement;
+	let dropZone: HTMLDivElement;
+
+	// Initialize worker
+	onMount(() => {
+		worker = new Worker('./workers/firmware-worker.ts', { type: 'module' });
+
+		worker.onmessage = (e: MessageEvent) => {
+			const { type, id, result, error, message } = e.data;
+
+			if (type === 'success') {
+				if (id === 'analyze') {
+					// After analysis, list planes and images
+					statusMessage = 'Firmware analyzed. Loading resources...';
+					loadResources();
+				} else if (id === 'listPlanes') {
+					const planes = result as FontPlaneInfo[];
+					buildFontTree(planes);
+				} else if (id === 'listImages') {
+					const images = result as BitmapFileInfo[];
+					imageList = images;
+					buildImageTree(images);
+				} else if (id === 'extractPlane') {
+					const data = result as typeof planeData;
+					planeData = data;
+					isProcessing = false;
+					statusMessage = `Loaded plane: ${data?.name ?? 'Unknown'}`;
+				} else if (id === 'extractImage') {
+					const data = result as typeof imageData;
+					imageData = data;
+					isProcessing = false;
+					statusMessage = `Loaded image: ${data?.name ?? 'Unknown'}`;
 				}
-			]
+			} else if (type === 'progress') {
+				statusMessage = message;
+			} else if (type === 'error') {
+				statusMessage = `Error: ${error}`;
+				isProcessing = false;
+			}
+		};
+
+		worker.onerror = (err) => {
+			statusMessage = `Worker error: ${err.message}`;
+			isProcessing = false;
+		};
+
+		return () => {
+			worker?.terminate();
+		};
+	});
+
+	// Load resources after analysis
+	async function loadResources() {
+		if (!worker || !firmwareData) return;
+
+		// List fonts
+		worker.postMessage({
+			type: 'listPlanes',
+			id: 'listPlanes',
+			firmware: new Uint8Array() // Empty, worker uses cached data
+		});
+
+		// List images
+		worker.postMessage({
+			type: 'listImages',
+			id: 'listImages',
+			firmware: new Uint8Array()
+		});
+	}
+
+	// Build font tree structure
+	function buildFontTree(planes: FontPlaneInfo[]) {
+		const fontNodes = planes
+			.filter((p) => p.estimatedCount > 0)
+			.map((plane) => ({
+				id: `plane-${plane.name}`,
+				label: `${plane.name} (${plane.estimatedCount})`,
+				type: 'plane' as const,
+				data: plane,
+				children: []
+			}));
+
+		treeNodes = [
+			{
+				id: 'fonts',
+				label: 'Unicode Planes',
+				type: 'folder',
+				children: fontNodes
+			},
+			...(treeNodes.length > 1 ? [treeNodes[1]] : []) // Preserve images if already added
+		];
+	}
+
+	// Build image tree structure
+	function buildImageTree(images: BitmapFileInfo[]) {
+		const imageNodes = images.map((img, idx) => {
+			return {
+				id: `image-${idx}`,
+				label: `${img.name} (${img.width}x${img.height})`,
+				type: 'image' as const,
+				data: img, // Use the image data directly with offset from worker
+				children: []
+			};
+		});
+
+		// Update or add images folder
+		const imagesNode = {
+			id: 'images',
+			label: 'Firmware Images',
+			type: 'folder' as const,
+			children: imageNodes
+		};
+
+		if (treeNodes.length > 0 && treeNodes[0].id === 'fonts') {
+			treeNodes = [treeNodes[0], imagesNode];
+		} else {
+			treeNodes = [...treeNodes, imagesNode];
 		}
-	];
+	}
 
-	// Tabs data
-	const tabs = [
-		{ id: 'desktop', label: 'Desktop' },
-		{ id: 'mycomputer', label: 'My computer' },
-		{ id: 'controlpanel', label: 'Control panel' },
-		{ id: 'devices', label: 'Devices manager' }
-	];
+	// Handle tree node click
+	function handleNodeClick(node: TreeNode) {
+		selectedNode = node;
 
-	// TableView data
-	const tableHeaders = ['Name', 'Version', 'Company'];
-	const tableRows = [
-		{
-			key: 'row1',
-			cells: [
-				{ content: 'MySQL ODBC 3.51 Driver' },
-				{ content: '3.51.11.00' },
-				{ content: 'MySQL AB' }
-			]
-		},
-		{
-			key: 'row2',
-			cells: [{ content: 'SQL Server' }, { content: '3.70.06.23' }, { content: 'Microsoft Corporation' }]
-		},
-		{
-			key: 'row3',
-			cells: [{ content: 'SQL Server' }, { content: '3.70.06.23' }, { content: 'Microsoft Corporation' }]
-		},
-		{
-			key: 'row4',
-			cells: [{ content: 'SQL Server' }, { content: '3.70.06.23' }, { content: 'Microsoft Corporation' }]
-		},
-		{
-			key: 'row5',
-			cells: [{ content: 'SQL Server' }, { content: '3.70.06.23' }, { content: 'Microsoft Corporation' }]
+		if (node.type === 'plane' && node.data) {
+			loadPlane(node.data as FontPlaneInfo);
+		} else if (node.type === 'image' && node.data) {
+			loadImage(node.data as BitmapFileInfo & { offset: number });
 		}
-	];
+	}
 
-	// Dropdown options
-	const ratingOptions = [
-		{ value: '5', label: '5 - Incredible!' },
-		{ value: '4', label: '4 - Great!' },
-		{ value: '3', label: '3 - Pretty good' },
-		{ value: '2', label: '2 - Not so great' },
-		{ value: '1', label: '1 - Unfortunate' }
-	];
+	// Find node by ID (recursive helper)
+	function findNodeById(nodes: TreeNode[], id: string): TreeNode | null {
+		for (const node of nodes) {
+			if (node.id === id) return node;
+			if (node.children) {
+				const found = findNodeById(node.children, id);
+				if (found) return found;
+			}
+		}
+		return null;
+	}
 
-	function handleButtonClick(): void {
-		buttonText = 'I was clicked!';
+	// Handle tree node selection from TreeView onSelect
+	function handleSelectNode(nodeId: string) {
+		const node = findNodeById(treeNodes, nodeId);
+		if (node) {
+			handleNodeClick(node);
+		}
+	}
+
+	// Load font plane
+	function loadPlane(plane: FontPlaneInfo) {
+		if (!worker || !firmwareData || isProcessing) return;
+
+		isProcessing = true;
+		statusMessage = `Extracting ${plane.name}...`;
+		imageData = null; // Clear image data
+
+		worker.postMessage({
+			type: 'extractPlane',
+			id: 'extractPlane',
+			firmware: new Uint8Array(), // Worker uses cached data
+			planeName: plane.name,
+			start: plane.start,
+			end: plane.end
+		});
+	}
+
+	// Load image
+	function loadImage(image: BitmapFileInfo & { offset: number }) {
+		if (!worker || !firmwareData || isProcessing) return;
+
+		isProcessing = true;
+		statusMessage = `Extracting ${image.name}...`;
+		planeData = null; // Clear plane data
+
+		worker.postMessage({
+			type: 'extractImage',
+			id: 'extractImage',
+			firmware: new Uint8Array(),
+			imageName: image.name,
+			width: image.width,
+			height: image.height,
+			offset: image.offset!
+		});
+	}
+
+	// File handling
+	function handleFileSelect(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (file) {
+			loadFirmware(file);
+		}
+	}
+
+	async function loadFirmware(file: File) {
+		isProcessing = true;
+		progress = 10;
+		statusMessage = `Loading ${file.name}...`;
+
+		try {
+			const arrayBuffer = await file.arrayBuffer();
+			firmwareData = new Uint8Array(arrayBuffer);
+
+			progress = 30;
+			statusMessage = 'Analyzing firmware...';
+
+			// Analyze firmware
+			worker!.postMessage({
+				type: 'analyze',
+				id: 'analyze',
+				firmware: firmwareData
+			});
+
+			progress = 100;
+		} catch (err) {
+			statusMessage = `Error loading file: ${err}`;
+			isProcessing = false;
+		}
+	}
+
+	// Drag and drop handlers
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		dropZone.classList.add('drag-over');
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		e.preventDefault();
+		dropZone.classList.remove('drag-over');
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dropZone.classList.remove('drag-over');
+
+		const file = e.dataTransfer?.files[0];
+		if (file) {
+			loadFirmware(file);
+		}
+	}
+
+	// Trigger file input
+	function triggerFileInput() {
+		fileInput.click();
 	}
 </script>
 
 <div class="container">
-	<h1>98.css Component Library Demo</h1>
-	<p>A collection of Svelte TypeScript components wrapping 98.css styles.</p>
+	<h1>Firmware Browser</h1>
+	<p>Drag and drop a firmware file or click to browse</p>
 
-	<div class="grid">
-		<!-- Buttons -->
-		<Window title="Buttons" width="300px">
-			<WindowBody>
-				<Button onclick={handleButtonClick}>{buttonText}</Button>
-				<br /><br />
-				<Button variant="primary">OK</Button>
-				<br /><br />
-				<Button disabled>Disabled</Button>
-			</WindowBody>
-		</Window>
+	<!-- Drop Zone -->
+	<div
+		bind:this={dropZone}
+		class="drop-zone"
+		ondragover={handleDragOver}
+		ondragleave={handleDragLeave}
+		ondrop={handleDrop}
+		onclick={triggerFileInput}
+		onkeydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				triggerFileInput();
+			}
+		}}
+		role="button"
+		tabindex="0"
+	>
+		<input type="file" bind:this={fileInput} hidden onchange={handleFileSelect} />
+		<div class="drop-zone-content">
+			{#if !firmwareData}
+				<div class="drop-icon">📁</div>
+				<div class="drop-text">Drop firmware file here or click to browse</div>
+			{:else}
+				<div class="drop-icon">✅</div>
+				<div class="drop-text">Firmware loaded! Click to load a different file</div>
+			{/if}
+		</div>
+	</div>
 
-		<!-- Checkbox -->
-		<Window title="Checkbox" width="300px">
-			<WindowBody>
-				<Checkbox label="This is a checkbox" bind:checked={checked} />
-				<p>Checked: {checked ? 'Yes' : 'No'}</p>
-			</WindowBody>
-		</Window>
-
-		<!-- Radio Buttons -->
-		<Window title="Radio Buttons" width="300px">
-			<WindowBody>
-				<Radio label="Option 1" name="example" value="option1" bind:checked={radio1} />
-				<Radio label="Option 2" name="example" value="option2" bind:checked={radio2} />
-				<p>Selected: {radio1 ? 'option1' : radio2 ? 'option2' : 'none'}</p>
-			</WindowBody>
-		</Window>
-
-		<!-- TextBox -->
-		<Window title="TextBox" width="300px">
-			<WindowBody>
-				<TextBox label="Occupation:" bind:value={textField} placeholder="Enter occupation" />
-				<br />
-				<TextBox
-					label="Address:"
-					bind:value={textAreaValue}
-					type="textarea"
-					rows={4}
-					fieldRowStacked
-				/>
-			</WindowBody>
-		</Window>
-
-		<!-- Slider -->
-		<Window title="Slider" width="300px">
-			<WindowBody>
-				<Slider label="Volume:" bind:value={sliderValue} min={1} max={11} />
-				<p>Value: {sliderValue}</p>
-				<br />
-				<Slider label="Cowbell:" bind:value={sliderValue} min={1} max={3} step={1} hasBoxIndicator vertical />
-			</WindowBody>
-		</Window>
-
-		<!-- Dropdown -->
-		<Window title="Dropdown" width="300px">
-			<WindowBody>
-				<Dropdown bind:value={dropdownValue} options={ratingOptions} placeholder="Select rating" />
-				<p>Selected: {dropdownValue}</p>
-			</WindowBody>
-		</Window>
-
-		<!-- GroupBox -->
-		<Window title="GroupBox" width="300px">
-			<WindowBody>
-				<GroupBox label="Select one:">
-					<div class="field-row">
-						<Radio label="Diners" name="group-example" value="diners" bind:checked={radioDiners} />
-					</div>
-					<div class="field-row">
-						<Radio label="Drive-Ins" name="group-example" value="driveins" bind:checked={radioDriveIns} />
-					</div>
-					<div class="field-row">
-						<Radio label="Dives" name="group-example" value="dives" bind:checked={radioDives} />
-					</div>
-				</GroupBox>
-			</WindowBody>
-		</Window>
-
-		<!-- TreeView -->
-		<Window title="TreeView" width="300px">
-			<WindowBody>
-				<TreeView nodes={treeNodes} />
-			</WindowBody>
-		</Window>
-
-		<!-- Tabs -->
-		<Window title="Tabs" width="400px">
-			<WindowBody>
-				<p>Hello, world!</p>
-				<Tabs bind:selectedTab={selectedTab} {tabs}>
-					{#if selectedTab === 'desktop'}
-						<p>Desktop content</p>
-					{:else if selectedTab === 'mycomputer'}
-						<p>My Computer content</p>
-					{:else if selectedTab === 'controlpanel'}
-						<p>Control Panel content</p>
-					{:else if selectedTab === 'devices'}
-						<p>Devices Manager content</p>
-					{/if}
-				</Tabs>
-			</WindowBody>
-		</Window>
-
-		<!-- TableView -->
-		<Window title="TableView" width="300px">
-			<WindowBody>
-				<TableView
-					headers={tableHeaders}
-					rows={tableRows}
-					bind:selectedRow={selectedTableRow}
-					interactive
-				/>
-				<p>Selected row: {selectedTableRow ?? 'None'}</p>
-			</WindowBody>
-		</Window>
-
-		<!-- ProgressBar -->
-		<Window title="ProgressBar" width="300px">
+	<!-- Progress Bar -->
+	{#if isProcessing}
+		<Window title="Processing" width="600px">
 			<WindowBody>
 				<ProgressBar value={progress} />
-				<br />
-				<ProgressBar value={progress} segmented />
-				<br />
-				<Button onclick={() => progress = Math.min(progress + 10, 100)}>Increase</Button>
-				<Button onclick={() => progress = Math.max(progress - 10, 0)}>Decrease</Button>
+				<p>{statusMessage}</p>
 			</WindowBody>
 		</Window>
+	{/if}
 
-		<!-- FieldBorder -->
-		<Window title="FieldBorder" width="300px">
-			<WindowBody>
-				<FieldBorder variant="default">Work area</FieldBorder>
-				<br />
-				<FieldBorder variant="disabled">Disabled work area</FieldBorder>
-				<br />
-				<FieldBorder variant="status">Dynamic content</FieldBorder>
-			</WindowBody>
-		</Window>
-	</div>
+	<!-- Main Browser Interface -->
+	{#if firmwareData && treeNodes.length > 0}
+		<div class="browser-layout">
+			<!-- Tree View -->
+			<Window title="Resources" class="tree-window">
+				<WindowBody>
+					<TreeView
+						nodes={treeNodes}
+						expanded={expandedNodes}
+						onSelect={(nodeId) => handleSelectNode(nodeId)}
+					/>
+				</WindowBody>
+			</Window>
+
+			<!-- Resource Browser -->
+			<Window title="Resource Browser" class="browser-window">
+				<WindowBody>
+					{#if selectedNode}
+						{#if selectedNode.type === 'plane' && planeData}
+							<div class="plane-header">
+								<h2>{planeData.name}</h2>
+								<p>U+{planeData.start.toString(16).toUpperCase()} - U+{planeData.end.toString(16).toUpperCase()}</p>
+								<p>{planeData.fonts.length} fonts found</p>
+							</div>
+							<FontGridRenderer fonts={planeData.fonts} zoom={10} />
+						{:else if selectedNode.type === 'image' && imageData}
+							<ImageRenderer
+								name={imageData.name}
+								width={imageData.width}
+								height={imageData.height}
+								rgb565Data={imageData.rgb565Data}
+								zoom={2}
+							/>
+						{/if}
+					{:else}
+						<div class="empty-state">
+							<p>Select a resource from the tree to view its contents</p>
+						</div>
+					{/if}
+				</WindowBody>
+			</Window>
+		</div>
+	{/if}
+
+	<!-- Status Bar -->
+	<StatusBar statusFields={[{ text: statusMessage }]} />
 </div>
 
 <style>
 	.container {
 		padding: 20px;
-		max-width: 1400px;
+		max-width: 1600px;
 		margin: 0 auto;
 		font-family: 'Tahoma', sans-serif;
 	}
@@ -276,14 +403,78 @@
 		margin-bottom: 10px;
 	}
 
-	.grid {
+	p {
+		margin: 8px 0;
+	}
+
+	.drop-zone {
+		margin: 20px 0;
+		padding: 40px;
+		border: 3px dashed #808080;
+		background-color: #c0c0c0;
+		text-align: center;
+		cursor: pointer;
+		transition: background-color 0.2s;
+	}
+
+	.drop-zone:hover,
+	.drop-zone :global(.drag-over) {
+		background-color: #d0d0d0;
+		border-color: #000080;
+	}
+
+	.drop-zone-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.drop-icon {
+		font-size: 48px;
+	}
+
+	.drop-text {
+		font-size: 14px;
+		color: #000000;
+	}
+
+	.browser-layout {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-		gap: 20px;
+		grid-template-columns: 350px 1fr;
+		gap: 10px;
 		margin-top: 20px;
 	}
 
-	p {
-		margin: 8px 0;
+	:global(.tree-window) {
+		min-height: 400px;
+	}
+
+	:global(.browser-window) {
+		min-height: 400px;
+	}
+
+	.plane-header {
+		margin-bottom: 16px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #808080;
+	}
+
+	.plane-header h2 {
+		font-size: 16px;
+		margin: 0 0 8px 0;
+	}
+
+	.plane-header p {
+		font-size: 12px;
+		margin: 4px 0;
+	}
+
+	.empty-state {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 300px;
+		color: #808080;
 	}
 </style>
