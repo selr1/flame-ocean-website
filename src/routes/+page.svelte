@@ -598,7 +598,7 @@
     max-width: 1024px;
     max-height: 768px;
     width: 100%;
-    height: 100%;
+    height: auto;
     margin: 64px;
     box-sizing: border-box;
     display: flex;
@@ -606,36 +606,34 @@
   }
 
   :global(.browser-window .window-body) {
-    flex-grow: 1;
-    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .browser-layout {
     display: grid;
     grid-template-columns: 220px 1fr;
+    grid-template-rows: 1fr;
     gap: 0;
-    height: 100%;
-    max-height: 100%;
     width: 100%;
-    min-height: 600px;
+    height: 600px;
+    overflow: hidden;
   }
 
   .tree-panel {
-    max-height: 100%;
-    overflow-y: auto;
-    box-sizing: border-box;
+    overflow: hidden;
+    height: 100%;
   }
 
   .tree-panel :global(.tree-view) {
     height: 100%;
-    max-height: 100%;
-    box-sizing: border-box;
   }
 
   .content-panel {
     padding: 8px;
     overflow-y: auto;
-    max-height: 700px;
+    height: 100%;
   }
 
   .plane-header {
