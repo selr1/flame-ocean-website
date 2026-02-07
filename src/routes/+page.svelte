@@ -601,11 +601,13 @@
     height: 100%;
     margin: 64px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
 
   :global(.browser-window .window-body) {
-    height: 100%;
-    width: 100%;
+    flex-grow: 1;
+    max-height: 100%;
   }
 
   .browser-layout {
@@ -613,17 +615,20 @@
     grid-template-columns: 220px 1fr;
     gap: 0;
     height: 100%;
+    max-height: 100%;
     width: 100%;
     min-height: 600px;
   }
 
   .tree-panel {
-    overflow-y: auto;
+    max-height: 100%;
     box-sizing: border-box;
   }
 
   .tree-panel :global(.tree-view) {
-    min-height: 100%;
+    height: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
   }
 
   .content-panel {
