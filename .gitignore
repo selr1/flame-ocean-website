@@ -26,3 +26,8 @@ vite.config.ts.timestamp-*
 *.img
 *.IMG
 Read me.txt
+
+# Test fixtures
+/tmp/echo-mini-firmwares
+references/firmwares/
+references/extracted_bitmaps_smart/

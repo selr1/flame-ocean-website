@@ -31,14 +31,6 @@ export interface MisalignmentResult {
 }
 
 /**
- * Metadata table location
- */
-interface MetadataTableLocation {
-	readonly offset: number;
-	readonly method: string;
-}
-
-/**
  * Resource extractor class
  */
 export class ResourceExtractor {
@@ -59,29 +51,36 @@ export class ResourceExtractor {
 
 	/**
 	 * Find metadata table using ROCK26 anchor method
-	 * @returns Table offset or null if not found
+	 * CRITICAL: Must search within Part 5 only, not entire firmware!
+	 * @returns Table offset (relative to firmware) or null if not found
 	 */
 	private findMetadataTableByRock26Anchor(): number | null {
-		const rock26Offset = this.reader.find(ROCK26_SIGNATURE);
-		if (rock26Offset === -1) {
+		// Extract Part 5 data first
+		const part5Offset = this.reader.readU32LE(0x14c);
+		const part5Size = this.reader.readU32LE(0x150);
+		const part5Data = this.firmware.slice(part5Offset, part5Offset + part5Size);
+
+		// Find ROCK26 signature within Part 5
+		const rock26OffsetInPart5 = findBytes(part5Data, ROCK26_SIGNATURE);
+		if (rock26OffsetInPart5 === -1) {
 			return null;
 		}
 
-		const rock26EntriesStart = rock26Offset + 32;
+		const rock26EntriesStart = rock26OffsetInPart5 + 32;
 
-		// Read ROCK26 Entry 0 offset as anchor
-		const anchorOffset = this.reader.readU32LE(rock26EntriesStart + 12);
+		// Read ROCK26 Entry 0 offset as anchor (offset is relative to Part 5)
+		const anchorOffset = readU32LE(part5Data, rock26EntriesStart + 12);
 
-		// Search for this offset value in Part 5
-		const matchingPositions: number[] = [];
+		// Search for this offset value in Part 5 only
+		const matchingPositionsInPart5: number[] = [];
 
-		for (let pos = 0; pos < this.firmware.length - METADATA_ENTRY_SIZE; pos += 4) {
+		for (let pos = 0; pos < part5Data.length - METADATA_ENTRY_SIZE; pos += 4) {
 			try {
-				const entryOffset = this.reader.readU32LE(pos + 20);
+				const entryOffset = readU32LE(part5Data, pos + 20);
 
 				if (entryOffset === anchorOffset) {
 					// Verify it's a valid metadata entry
-					const nameBytes = this.firmware.slice(pos + 32, pos + 96);
+					const nameBytes = part5Data.slice(pos + 32, pos + 96);
 					const nullIdx = nameBytes.indexOf(0);
 					const name =
 						nullIdx >= 0
@@ -89,7 +88,7 @@ export class ResourceExtractor {
 							: new TextDecoder('ascii', { fatal: false }).decode(nameBytes);
 
 					if (name.endsWith('.BMP') && name.length >= 3) {
-						matchingPositions.push(pos);
+						matchingPositionsInPart5.push(pos);
 					}
 				}
 			} catch {
@@ -97,17 +96,17 @@ export class ResourceExtractor {
 			}
 		}
 
-		if (matchingPositions.length === 0) {
+		if (matchingPositionsInPart5.length === 0) {
 			return null;
 		}
 
 		// Find the earliest valid entry by scanning backwards
-		const firstMatch = Math.min(...matchingPositions);
-		let tableStart = firstMatch;
+		const firstMatch = Math.min(...matchingPositionsInPart5);
+		let tableStartInPart5 = firstMatch;
 
-		while (tableStart >= METADATA_ENTRY_SIZE) {
-			const testPos = tableStart - METADATA_ENTRY_SIZE;
-			const testEntry = this.firmware.slice(testPos, testPos + METADATA_ENTRY_SIZE);
+		while (tableStartInPart5 >= METADATA_ENTRY_SIZE) {
+			const testPos = tableStartInPart5 - METADATA_ENTRY_SIZE;
+			const testEntry = part5Data.slice(testPos, testPos + METADATA_ENTRY_SIZE);
 			const nameBytes = testEntry.slice(32, 96);
 			const nullIdx = nameBytes.indexOf(0);
 			const testName =
@@ -121,13 +120,14 @@ export class ResourceExtractor {
 				testName.length >= 3 &&
 				this.isPrintable(testName)
 			) {
-				tableStart = testPos;
+				tableStartInPart5 = testPos;
 			} else {
 				break;
 			}
 		}
 
-		return tableStart;
+		// Return offset relative to firmware (Part 5 offset + offset within Part 5)
+		return part5Offset + tableStartInPart5;
 	}
 
 	/**
@@ -159,14 +159,22 @@ export class ResourceExtractor {
 
 	/**
 	 * Parse metadata table from Part 5
-	 * @param tableStart - Starting offset of the table
+	 * @param tableStart - Starting offset of the table (relative to firmware)
 	 * @returns Array of metadata entries
 	 */
 	parseMetadataTable(tableStart: number): BitmapMetadata[] {
+		// Get Part 5 bounds to limit parsing
+		const part5Offset = this.reader.readU32LE(0x14c);
+		const part5Size = this.reader.readU32LE(0x150);
+
+		// Use Part 5 end if available, otherwise fall back to firmware length
+		// This allows tests to work without full Part 5 setup
+		const part5End = part5Size > 0 ? part5Offset + part5Size : this.firmware.length;
+
 		const entries: BitmapMetadata[] = [];
 		let pos = tableStart;
 
-		while (pos + METADATA_ENTRY_SIZE <= this.firmware.length) {
+		while (pos + METADATA_ENTRY_SIZE <= part5End) {
 			const entry = this.firmware.slice(pos, pos + METADATA_ENTRY_SIZE);
 
 			const nameBytes = entry.slice(32, 96);
