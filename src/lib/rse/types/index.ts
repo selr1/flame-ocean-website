@@ -265,3 +265,31 @@ export interface BatchResult {
 	/** Large font count */
 	readonly large: number;
 }
+
+/**
+ * Font plane information for listing
+ */
+export interface FontPlaneInfo {
+	/** Plane/Range name */
+	readonly name: string;
+	/** Start code point */
+	readonly start: number;
+	/** End code point */
+	readonly end: number;
+	/** Estimated font count in this plane */
+	readonly estimatedCount: number;
+}
+
+/**
+ * Bitmap file information for directory listing
+ */
+export interface BitmapFileInfo {
+	/** File name */
+	readonly name: string;
+	/** Width in pixels */
+	readonly width: number;
+	/** Height in pixels */
+	readonly height: number;
+	/** Size in bytes */
+	readonly size: number;
+}

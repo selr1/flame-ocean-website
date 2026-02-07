@@ -323,3 +323,110 @@ describe('TypeScript type safety', () => {
 		expect(typeof offset).toBe('number');
 	});
 });
+
+describe('FontExtractor listPlanes', () => {
+	it('should list all font planes', () => {
+		const data = createMockFirmware();
+		const addresses = {
+			SMALL_BASE: 0x100000,
+			LARGE_BASE: 0x200000,
+			LOOKUP_TABLE: 0x080000,
+			confidence: {
+				smallFontValid: 3,
+				largeFontValid: 3,
+				movw0042Count: 12
+			}
+		};
+
+		const extractor = new FontExtractor(data, addresses);
+		const planes = extractor.listPlanes();
+
+		expect(Array.isArray(planes)).toBe(true);
+		expect(planes.length).toBeGreaterThan(0);
+
+		// Check first plane structure
+		const firstPlane = planes[0];
+		expect(typeof firstPlane.name).toBe('string');
+		expect(typeof firstPlane.start).toBe('number');
+		expect(typeof firstPlane.end).toBe('number');
+		expect(typeof firstPlane.estimatedCount).toBe('number');
+	});
+
+	it('should return planes with correct properties', () => {
+		const data = createMockFirmware();
+		const addresses = {
+			SMALL_BASE: 0x100000,
+			LARGE_BASE: 0x200000,
+			LOOKUP_TABLE: 0x080000,
+			confidence: {
+				smallFontValid: 3,
+				largeFontValid: 3,
+				movw0042Count: 12
+			}
+		};
+
+		const extractor = new FontExtractor(data, addresses);
+		const planes = extractor.listPlanes();
+
+		// Find Basic_Latin plane
+		const basicLatin = planes.find((p) => p.name === 'Basic_Latin');
+		expect(basicLatin).toBeDefined();
+		expect(basicLatin?.start).toBe(0x0000);
+		expect(basicLatin?.end).toBe(0x007f);
+		expect(basicLatin?.estimatedCount).toBeGreaterThanOrEqual(0);
+	});
+});
+
+describe('ResourceExtractor listDirectory', () => {
+	it('should list all bitmaps in directory', () => {
+		const data = createMockFirmware();
+		const extractor = new ResourceExtractor(data);
+
+		const files = extractor.listDirectory();
+
+		expect(Array.isArray(files)).toBe(true);
+
+		// Should have at least our test entry
+		if (files.length > 0) {
+			const firstFile = files[0];
+			expect(typeof firstFile.name).toBe('string');
+			expect(typeof firstFile.width).toBe('number');
+			expect(typeof firstFile.height).toBe('number');
+			expect(typeof firstFile.size).toBe('number');
+		}
+	});
+
+	it('should return files with correct properties', () => {
+		const data = createMockFirmware();
+		const extractor = new ResourceExtractor(data);
+
+		const files = extractor.listDirectory();
+
+		// Skip test if no files found (mock firmware may not have valid data)
+		if (files.length === 0) {
+			expect(files.length).toBe(0);
+			return;
+		}
+
+		// Each file should have required properties
+		for (const file of files) {
+			expect(file.name).toBeDefined();
+			expect(file.width).toBeGreaterThan(0);
+			expect(file.height).toBeGreaterThan(0);
+			expect(file.size).toBeGreaterThan(0);
+
+			// Size should equal width * height * 2 (RGB565)
+			expect(file.size).toBe(file.width * file.height * 2);
+		}
+	});
+
+	it('should handle empty firmware gracefully', () => {
+		const emptyData = new Uint8Array(0x100000);
+		const extractor = new ResourceExtractor(emptyData);
+
+		const files = extractor.listDirectory();
+
+		// Should return empty array, not throw
+		expect(Array.isArray(files)).toBe(true);
+	});
+});

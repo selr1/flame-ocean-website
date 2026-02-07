@@ -7,7 +7,8 @@ import type {
 	UnicodeRange,
 	FontExtractionResult,
 	RangeResult,
-	PixelData
+	PixelData,
+	FontPlaneInfo
 } from '../types/index.js';
 import { UNICODE_RANGES } from '../utils/unicode-ranges.js';
 import { createMonoBmp, isValidFontData } from '../utils/bitmap.js';
@@ -309,5 +310,76 @@ export class FontExtractor {
 		}
 
 		return results;
+	}
+
+	/**
+	 * List all font planes/ranges with estimated font counts
+	 * @returns Array of font plane information
+	 */
+	listPlanes(): FontPlaneInfo[] {
+		const planes: FontPlaneInfo[] = [];
+
+		for (const { name, start, end } of this.unicodeRanges) {
+			// Count SMALL fonts in this range
+			let smallCount = 0;
+			for (let uni = start; uni <= end; uni++) {
+				const addr = this.unicodeToSmallAddr(uni);
+				const stride = this.SMALL_STRIDE;
+
+				if (addr < 0 || addr + stride > this.firmware.length) {
+					continue;
+				}
+
+				const chunk = this.firmware.slice(addr, addr + stride);
+				if (this.isDataEmpty(chunk)) {
+					continue;
+				}
+
+				try {
+					const lookupVal = this.getLookup(uni);
+					const pixels = this.decodeV8(chunk, lookupVal);
+					if (pixels.length === 16 && isValidFontData(pixels, 'SMALL')) {
+						smallCount++;
+					}
+				} catch {
+					continue;
+				}
+			}
+
+			// Count LARGE fonts in this range
+			let largeCount = 0;
+			for (let uni = start; uni <= end; uni++) {
+				const addr = this.unicodeToLargeAddr(uni);
+				const stride = this.LARGE_STRIDE;
+
+				if (addr < 0 || addr + stride > this.firmware.length) {
+					continue;
+				}
+
+				const chunk = this.firmware.slice(addr, addr + stride);
+				if (this.isDataEmpty(chunk)) {
+					continue;
+				}
+
+				try {
+					const lookupVal = this.getLookup(uni);
+					const pixels = this.decodeV8(chunk, lookupVal);
+					if (pixels.length === 16 && isValidFontData(pixels, 'LARGE')) {
+						largeCount++;
+					}
+				} catch {
+					continue;
+				}
+			}
+
+			planes.push({
+				name,
+				start,
+				end,
+				estimatedCount: smallCount + largeCount
+			});
+		}
+
+		return planes;
 	}
 }

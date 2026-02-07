@@ -29,5 +29,7 @@ export type {
 	FontExtractionResult,
 	BitmapExtractionResult,
 	BatchResult,
-	FirmwarePartition
+	FirmwarePartition,
+	FontPlaneInfo,
+	BitmapFileInfo
 } from './types/index.js';

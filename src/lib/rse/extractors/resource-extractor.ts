@@ -7,7 +7,8 @@ import type {
 	MisalignmentDetection,
 	DetectionInfo,
 	DetectionCheck,
-	BitmapExtractionResult
+	BitmapExtractionResult,
+	BitmapFileInfo
 } from '../types/index.js';
 import { BinaryReader, findBytes } from '../utils/struct.js';
 import { convertToBmp } from '../utils/bitmap.js';
@@ -513,5 +514,90 @@ export class ResourceExtractor {
 	 */
 	private writeFile(path: string, data: Uint8Array): void {
 		fileIO.writeFileSync(path, data);
+	}
+
+	/**
+	 * List all bitmaps in the directory with file info (name, dimensions, size)
+	 * @returns Array of bitmap file information
+	 */
+	listDirectory(): BitmapFileInfo[] {
+		// Find metadata table
+		const tableStart = this.findMetadataTableInPart5();
+		if (tableStart === null) {
+			return [];
+		}
+
+		// Parse metadata table
+		const metadataEntries = this.parseMetadataTable(tableStart);
+
+		// Find ROCK26 table for misalignment detection
+		const rock26Offset = this.reader.find(ROCK26_SIGNATURE);
+		if (rock26Offset === -1) {
+			return [];
+		}
+
+		// Detect misalignment
+		const { misalignment, firstValidEntry } = this.detectOffsetMisalignment(
+			metadataEntries,
+			rock26Offset
+		);
+
+		const files: BitmapFileInfo[] = [];
+		const startIndex = firstValidEntry;
+		const endIndex = metadataEntries.length - (misalignment > 0 ? 1 : 0);
+
+		for (let i = startIndex; i < endIndex; i++) {
+			const entry = metadataEntries[i];
+
+			// Adjust offset based on misalignment
+			let offset: number;
+			if (misalignment > 0) {
+				const targetIndex = i + misalignment;
+				if (targetIndex >= metadataEntries.length) continue;
+				offset = metadataEntries[targetIndex].offset;
+			} else if (misalignment < 0) {
+				const targetIndex = i + misalignment;
+				if (targetIndex < 0) continue;
+				offset = metadataEntries[targetIndex].offset;
+			} else {
+				offset = entry.offset;
+			}
+
+			const name = entry.name;
+
+			// Get width/height from next entry
+			let width: number;
+			let height: number;
+			if (i + 1 < metadataEntries.length) {
+				width = metadataEntries[i + 1].width;
+				height = metadataEntries[i + 1].height;
+			} else {
+				width = entry.width;
+				height = entry.height;
+			}
+
+			// Calculate size (RGB565 = 2 bytes per pixel)
+			const size = width * height * 2;
+
+			// Skip invalid entries
+			if (
+				offset === 0 ||
+				width <= 0 ||
+				height <= 0 ||
+				width > 10000 ||
+				height > 10000
+			) {
+				continue;
+			}
+
+			files.push({
+				name,
+				width,
+				height,
+				size
+			});
+		}
+
+		return files;
 	}
 }
