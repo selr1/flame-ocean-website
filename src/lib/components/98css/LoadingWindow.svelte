@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { debugMode, debugAnimationComplete } from '$lib/stores';
+	import Window from './Window.svelte';
 	import WindowBody from './WindowBody.svelte';
 	import StatusBar from './StatusBar.svelte';
 	import ProgressBar from './ProgressBar.svelte';
@@ -74,51 +75,30 @@
 	});
 </script>
 
-<div class="loading-overlay">
-	<div class="loading-window" style="width: {width};">
-		<WindowBody>
-			<div class="loading-content">
-				{#if showProgress}
-					<div class="loading-progress-row">
-						<div class="loading-icon"></div>
+<Window {width} {statusFields}>
+	<WindowBody>
+		<div class="loading-content">
+			{#if showProgress}
+				<div class="loading-progress-row">
+					<div class="loading-icon"></div>
+					<div class="loading-progress-bar">
 						<ProgressBar value={displayedProgress} />
 					</div>
-				{/if}
+				</div>
+			{/if}
 
-				{#if message}
-					<p class="loading-message">{message}</p>
-				{/if}
+			{#if message}
+				<p class="loading-message">{message}</p>
+			{/if}
 
-				{#if children}
-					{@render children()}
-				{/if}
-			</div>
-		</WindowBody>
-
-		{#if statusFields && statusFields.length > 0}
-			<StatusBar {statusFields} />
-		{/if}
-	</div>
-</div>
+			{#if children}
+				{@render children()}
+			{/if}
+		</div>
+	</WindowBody>
+</Window>
 
 <style>
-	.loading-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background-color: rgba(0, 0, 0, 0.3);
-		z-index: 9999;
-	}
-
-	.loading-window {
-		box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
-	}
-
 	.loading-content {
 		padding: 8px;
 	}
@@ -136,6 +116,10 @@
 		background-size: 384px 48px;
 		animation: loading-animation 1s steps(8) infinite;
 		flex-shrink: 0;
+	}
+
+	.loading-progress-bar {
+		flex: 1;
 	}
 
 	@keyframes loading-animation {
