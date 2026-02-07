@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Grid } from 'svelte-virtual';
+	import { onMount, onDestroy } from 'svelte';
 
 	interface FontData {
 		unicode: number;
@@ -21,6 +22,32 @@
 	const itemWidth = $derived(FONT_WIDTH * zoom + 20);
 	const itemHeight = $derived(FONT_HEIGHT * zoom + 30);
 	const itemCount = $derived(fonts.length);
+
+	// Container height state
+	let containerHeight = $state(600);
+	let containerElement: HTMLDivElement;
+	let resizeObserver: ResizeObserver;
+
+	// Measure container height using ResizeObserver
+	function observeContainer() {
+		resizeObserver = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				const rect = entry.contentRect;
+				containerHeight = rect.height;
+			}
+		});
+
+		if (containerElement) {
+			resizeObserver.observe(containerElement);
+		}
+	}
+
+	onMount(() => {
+		observeContainer();
+		return () => {
+			resizeObserver?.disconnect();
+		};
+	});
 
 	// Helper function to get hex string
 	function getHexString(unicode: number): string {
@@ -63,12 +90,12 @@
 	}
 </script>
 
-<div class="font-grid-container">
+<div bind:this={containerElement} class="font-grid-container">
 	<Grid
 		itemCount={itemCount}
 		itemWidth={itemWidth}
 		itemHeight={itemHeight}
-		height={600}
+		height={containerHeight}
 	>
 		<div slot="item" let:index let:style class="font-item" {style}>
 			<div class="canvas-wrapper">
@@ -91,6 +118,10 @@
 		border: 2px solid;
 		border-color: #dfdfdf #808080 #808080 #dfdfdf;
 		padding: 4px;
+		height: 100%;
+		min-height: 0;
+		overflow: hidden;
+		box-sizing: border-box;
 	}
 
 	.font-item {
@@ -116,8 +147,6 @@
 	}
 
 	.unicode-label {
-		font-family: monospace;
-		font-size: 10px;
 		color: #000000;
 		margin-top: 4px;
 		text-align: center;

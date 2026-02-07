@@ -470,15 +470,16 @@
                 {:else if selectedNode.type === "plane" && planeData}
                   <div class="plane-header">
                     <h2>{planeData.name}</h2>
-                    <p>{(selectedNode.data as FontPlaneInfo).fontType} Fonts</p>
                     <p>
                       U+{planeData.start.toString(16).toUpperCase()} - U+{planeData.end
                         .toString(16)
                         .toUpperCase()}
                     </p>
-                    <p>{planeData.fonts.length} fonts found</p>
+                    <p>{planeData.fonts.length} glyphs found</p>
                   </div>
-                  <FontGridRenderer fonts={planeData.fonts} zoom={10} />
+                  <div class="flex-grow">
+                    <FontGridRenderer fonts={planeData.fonts} zoom={10} />
+                  </div>
                 {:else if selectedNode.type === "image" && imageData}
                   <ImageRenderer
                     name={imageData.name}
@@ -513,6 +514,10 @@
 </div>
 
 <style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+
   :global(body) {
     margin: 0;
     padding: 0;
@@ -629,15 +634,17 @@
   }
 
   .content-panel {
-    padding: 8px;
-    overflow-y: auto;
+    padding-left: 8px;
+    padding-top: 8px;
+    overflow: hidden;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
   }
 
   .plane-header {
-    margin-bottom: 16px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #808080;
   }
 
   .plane-header h2 {
@@ -656,5 +663,11 @@
     justify-content: center;
     height: 300px;
     color: #808080;
+  }
+
+  .flex-grow {
+    flex: 1 1 0;
+    min-height: 0;
+    box-sizing: border-box;
   }
 </style>
