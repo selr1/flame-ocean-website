@@ -16,12 +16,13 @@
 		nodes: TreeNode[];
 		expanded?: Set<string>;
 		selected?: Set<string>;
+		replacedImages?: string[];
 		onToggle?: (nodeId: string) => void;
 		onSelect?: (nodeId: string) => void;
 		children?: Snippet;
 	}
 
-	let { class: className, nodes, expanded = $bindable(new Set<string>()), selected = $bindable(new Set<string>()), onToggle, onSelect, children }: Props =
+	let { class: className, nodes, expanded = $bindable(new Set<string>()), selected = $bindable(new Set<string>()), replacedImages = [], onToggle, onSelect, children }: Props =
 		$props();
 
 	const treeViewClass = $derived(clsx('tree-view', className));
@@ -92,6 +93,7 @@
 														<span
 															class="leaf-node"
 															class:selected={isSelected(grandchild.id)}
+															class:replaced={replacedImages.includes(grandchild.label)}
 															onclick={() => onSelect?.(grandchild.id)}
 															onkeydown={(e) => handleLeafKeydown(grandchild.id, e)}
 															role="button"
@@ -108,6 +110,7 @@
 									<span
 										class="leaf-node"
 										class:selected={isSelected(child.id)}
+										class:replaced={replacedImages.includes(child.label)}
 										onclick={() => onSelect?.(child.id)}
 										onkeydown={(e) => handleLeafKeydown(child.id, e)}
 										role="button"
@@ -124,6 +127,7 @@
 				<span
 					class="leaf-node"
 					class:selected={isSelected(node.id)}
+					class:replaced={replacedImages.includes(node.label)}
 					onclick={() => onSelect?.(node.id)}
 					onkeydown={(e) => handleLeafKeydown(node.id, e)}
 					role="button"
@@ -154,6 +158,11 @@
 	.leaf-node.selected {
 		background-color: #000080;
 		color: #ffffff;
+	}
+
+	.leaf-node.replaced {
+		color: #0000ff;
+		font-weight: bold;
 	}
 
 	.leaf-node:focus {

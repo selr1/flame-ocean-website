@@ -34,7 +34,7 @@ function swapBytes16Bit(data: Uint8Array): Uint8Array {
 
 // Worker message types
 interface WorkerRequest {
-	type: 'analyze' | 'listPlanes' | 'listImages' | 'extractPlane' | 'extractImage' | 'replaceImage' | 'replaceImages';
+	type: 'analyze' | 'listPlanes' | 'listImages' | 'extractPlane' | 'extractImage' | 'replaceImage' | 'replaceImages' | 'getFirmware';
 	id: string;
 	firmware: Uint8Array;
 	fontType?: 'SMALL' | 'LARGE';
@@ -109,7 +109,7 @@ interface ReplaceImagesResult {
 }
 
 type WorkerResponse =
-	| { type: 'success'; id: string; result: FontPlaneInfo[] | BitmapFileInfo[] | PlaneData | ImageData | ReplaceImageResult | ReplaceImagesResult }
+	| { type: 'success'; id: string; result: FontPlaneInfo[] | BitmapFileInfo[] | PlaneData | ImageData | ReplaceImageResult | ReplaceImagesResult | Uint8Array }
 	| { type: 'progress'; id: string; message: string }
 	| { type: 'error'; id: string; error: string };
 
@@ -981,6 +981,21 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 						replaceError,
 						results
 					} as ReplaceImagesResult
+				});
+				break;
+			}
+
+			case 'getFirmware': {
+				if (!firmwareData) {
+					self.postMessage({ type: 'error', id, error: 'Firmware not analyzed. Call analyze first.' });
+					return;
+				}
+
+				// Return the modified firmware data
+				self.postMessage({
+					type: 'success',
+					id,
+					result: firmwareData
 				});
 				break;
 			}

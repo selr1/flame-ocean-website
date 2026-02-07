@@ -81,6 +81,9 @@
   let warningTitle = $state("");
   let warningMessage = $state("");
 
+  // Track replaced images - use array for better Svelte 5 reactivity
+  let replacedImages = $state<string[]>([]);
+
   // File input
   // svelte-ignore non_reactive_update
   let fileInput: HTMLInputElement;
@@ -373,6 +376,8 @@
     if (file) {
       loadFirmware(file);
     }
+    // Reset input so the same file can be selected again
+    target.value = '';
   }
 
   async function loadFirmware(file: File) {
@@ -493,9 +498,10 @@
         const { type, id, result } = e.data;
 
         if (id === "replaceImages") {
-          worker!.removeEventListener('message', handler);
-
+          // Only handle success/error messages, ignore progress
           if (type === 'success') {
+            worker!.removeEventListener('message', handler);
+
             const data = result as {
               successCount: number;
               notFound: string[];
@@ -513,6 +519,13 @@
                   height: imageData.height,
                   rgb565Data: r.rgb565Data
                 };
+              }
+            }
+
+            // Track replaced images - append new names to array
+            for (const r of data.results) {
+              if (!replacedImages.includes(r.imageName)) {
+                replacedImages = [...replacedImages, r.imageName];
               }
             }
 
@@ -542,12 +555,16 @@
             } else {
               statusMessage = `Successfully replaced ${data.successCount} image(s)`;
             }
-          } else if (type === 'error') {
-            showWarningDialog("Replacement Error", `Failed to replace images: ${result}`);
-          }
 
-          isProcessing = false;
-          resolve();
+            isProcessing = false;
+            resolve();
+          } else if (type === 'error') {
+            worker!.removeEventListener('message', handler);
+            showWarningDialog("Replacement Error", `Failed to replace images: ${result}`);
+            isProcessing = false;
+            resolve();
+          }
+          // For progress messages, just continue waiting
         }
       };
 
@@ -570,16 +587,44 @@
 
   // Export firmware with timestamp
   async function exportFirmware() {
-    if (!firmwareData) {
+    if (!firmwareData || !worker) {
       showWarningDialog("Export Error", "No firmware data to export.");
       return;
     }
 
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, -5);
-    const filename = `firmware_modified_${timestamp}.bin`;
+    isProcessing = true;
+    statusMessage = "Retrieving modified firmware...";
 
     try {
+      // Request the modified firmware from the worker
+      const modifiedFirmware = await new Promise<Uint8Array>((resolve, reject) => {
+        const handler = (e: MessageEvent) => {
+          const data = e.data;
+          if (data.id === "exportFirmware") {
+            worker!.removeEventListener("message", handler);
+            if (data.type === "success") {
+              resolve(data.result as Uint8Array);
+            } else {
+              reject(new Error(data.error || "Failed to retrieve modified firmware"));
+            }
+          }
+        };
+
+        worker!.addEventListener("message", handler);
+        worker!.postMessage({
+          type: "getFirmware",
+          id: "exportFirmware",
+          firmware: new Uint8Array(),
+        });
+      });
+
+      // Update the main thread's firmware data with the modified version
+      firmwareData = modifiedFirmware;
+
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const filename = `firmware_modified_${timestamp}.bin`;
+
       await fileIO.writeFile(filename, firmwareData);
       statusMessage = `Firmware exported as ${filename}`;
     } catch (err) {
@@ -587,6 +632,8 @@
         "Export Error",
         `Failed to export firmware: ${err instanceof Error ? err.message : String(err)}`
       );
+    } finally {
+      isProcessing = false;
     }
   }
 
@@ -747,6 +794,7 @@
                 expanded={expandedNodes}
                 selected={selectedNodeIds}
                 onSelect={(nodeId) => handleSelectNode(nodeId)}
+                replacedImages={replacedImages}
               />
             </div>
 
