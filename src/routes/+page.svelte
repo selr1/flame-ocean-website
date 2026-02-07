@@ -224,7 +224,7 @@
     const imageNodes = images.map((img, idx) => {
       return {
         id: `image-${idx}`,
-        label: `${img.name} (${img.width}x${img.height})`,
+        label: img.name,
         type: "image" as const,
         data: img, // Use the image data directly with offset from worker
         children: [],
