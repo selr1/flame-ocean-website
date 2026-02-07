@@ -553,7 +553,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 					}
 
 					// Count LARGE fonts for all ranges (not just CJK)
-					for (let uni = Math.max(start, 0x4e00); uni <= end; uni++) {
+					for (let uni = start; uni <= end; uni++) {
 						const addr = LARGE_BASE + (uni - 0x4e00) * LARGE_STRIDE;
 						if (addr + LARGE_STRIDE > firmwareData.length) continue;
 
@@ -773,7 +773,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 					}
 				} else {
 					// Extract LARGE fonts only
-					for (let uni = Math.max(start, 0x4e00); uni <= end; uni++) {
+					for (let uni = start; uni <= end; uni++) {
 						const addr = LARGE_BASE + (uni - 0x4e00) * LARGE_STRIDE;
 						if (addr + LARGE_STRIDE > firmwareData.length) continue;
 
