@@ -388,13 +388,25 @@
   function triggerFileInput() {
     fileInput.click();
   }
+
+  // Handle close button on resource viewer - reset and show file picker
+  function handleCloseResourceViewer() {
+    firmwareData = null;
+    treeNodes = [];
+    imageList = [];
+    selectedNode = null;
+    selectedNodeIds = new Set();
+    planeData = null;
+    imageData = null;
+    statusMessage = "Ready to load firmware";
+  }
 </script>
 
 <div class="page-wrapper">
   <div class="page-container">
     <!-- Drop Zone Window - hidden when loading or loaded -->
     {#if !firmwareData && !isProcessing}
-      <Window title="Firmware Browser" width="500px">
+      <Window title="FlameOcean" width="500px" showClose={false}>
         <WindowBody>
           <div
             bind:this={dropZone}
@@ -447,7 +459,11 @@
 
     <!-- Main Browser Interface -->
     {#if firmwareData && treeNodes.length > 0}
-      <Window title="Resource Browser" class="browser-window">
+      <Window
+        title="Resource Browser"
+        class="browser-window"
+        onclose={handleCloseResourceViewer}
+      >
         <WindowBody>
           <div class="browser-layout">
             <!-- Tree View -->
@@ -528,7 +544,6 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    font-family: "Tahoma", "MS Sans Serif", sans-serif;
   }
 
   .page-container {
@@ -558,6 +573,7 @@
   .status-footer :global(.status-bar) {
     border: none;
     margin: 0;
+    font-family: "Pixelated MS Sans Serif", Arial;
   }
 
   :global(.window) {

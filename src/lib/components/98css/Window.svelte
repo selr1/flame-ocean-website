@@ -25,6 +25,11 @@
 		showHelp?: boolean;
 		maximizeDisabled?: boolean;
 		statusFields?: StatusField[];
+		onclose?: () => void;
+		onminimize?: () => void;
+		onmaximize?: () => void;
+		onrestore?: () => void;
+		onhelp?: () => void;
 	}
 
 	let {
@@ -40,7 +45,12 @@
 		showRestore,
 		showHelp,
 		maximizeDisabled,
-		statusFields
+		statusFields,
+		onclose,
+		onminimize,
+		onmaximize,
+		onrestore,
+		onhelp
 	}: Props = $props();
 
 	const windowClass = $derived(clsx('window', className));
@@ -57,6 +67,11 @@
 			{showRestore}
 			{showHelp}
 			{maximizeDisabled}
+			{onclose}
+			{onminimize}
+			{onmaximize}
+			{onrestore}
+			{onhelp}
 		>
 			{title}
 		</TitleBar>
