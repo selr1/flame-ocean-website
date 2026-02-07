@@ -82,10 +82,9 @@ export class ResourceExtractor {
 					// Verify it's a valid metadata entry
 					const nameBytes = part5Data.slice(pos + 32, pos + 96);
 					const nullIdx = nameBytes.indexOf(0);
-					const name =
-						nullIdx >= 0
-							? new TextDecoder('ascii').decode(nameBytes.slice(0, nullIdx))
-							: new TextDecoder('ascii', { fatal: false }).decode(nameBytes);
+					// Decode ASCII, ignoring invalid bytes (matches Python's errors='ignore')
+					const validBytes = nullIdx >= 0 ? nameBytes.slice(0, nullIdx) : nameBytes;
+					const name = String.fromCharCode(...validBytes.filter(b => b < 128));
 
 					if (name.endsWith('.BMP') && name.length >= 3) {
 						matchingPositionsInPart5.push(pos);
@@ -109,10 +108,9 @@ export class ResourceExtractor {
 			const testEntry = part5Data.slice(testPos, testPos + METADATA_ENTRY_SIZE);
 			const nameBytes = testEntry.slice(32, 96);
 			const nullIdx = nameBytes.indexOf(0);
-			const testName =
-				nullIdx >= 0
-					? new TextDecoder('ascii').decode(nameBytes.slice(0, nullIdx))
-					: new TextDecoder('ascii', { fatal: false }).decode(nameBytes);
+			// Decode ASCII, ignoring invalid bytes (matches Python's errors='ignore')
+			const validBytes = nullIdx >= 0 ? nameBytes.slice(0, nullIdx) : nameBytes;
+			const testName = String.fromCharCode(...validBytes.filter(b => b < 128));
 
 			if (
 				testName &&
@@ -132,17 +130,17 @@ export class ResourceExtractor {
 
 	/**
 	 * Check if string contains only printable characters
+	 * Matches Python logic: all(c.isprintable() or c in '._-(), ' for c in test_name)
 	 */
 	private isPrintable(str: string): boolean {
+		const extraChars = new Set(['.', '_', '-', '(', ')', ',', ' ']);
 		for (const c of str) {
 			const code = c.charCodeAt(0);
-			if (
-				!(
-					(code >= 32 && code <= 126) ||
-					"._-(), ".includes(c) ||
-					(code >= 0xa0 && code <= 0xff)
-				)
-			) {
+			// Must be either printable OR in extra characters set
+			const isPrintable = code >= 32 && code <= 126;
+			const isExtraChar = extraChars.has(c);
+
+			if (!isPrintable && !isExtraChar) {
 				return false;
 			}
 		}
@@ -179,10 +177,9 @@ export class ResourceExtractor {
 
 			const nameBytes = entry.slice(32, 96);
 			const nullIdx = nameBytes.indexOf(0);
-			const name =
-				nullIdx >= 0
-					? new TextDecoder('ascii', { fatal: false }).decode(nameBytes.slice(0, nullIdx))
-					: '';
+			// Decode ASCII, ignoring invalid bytes (matches Python's errors='ignore')
+			const validBytes = nullIdx >= 0 ? nameBytes.slice(0, nullIdx) : new Uint8Array(0);
+			const name = String.fromCharCode(...validBytes.filter(b => b < 128));
 
 			if (!name || name.length < 3) {
 				break;
@@ -412,6 +409,16 @@ export class ResourceExtractor {
 			for (const check of detectionInfo.checks) {
 				console.log(`    - ${check.name}: ${JSON.stringify(check.result)}`);
 			}
+
+			// Show first 5 metadata entries for comparison with Python
+			console.log(`\n  First 5 metadata entries:`);
+			console.log(`    ${'Idx'.padStart(4)} ${'Name'.padEnd(30)} ${'Offset'.padStart(10)} ${'W'.padStart(6)} ${'H'.padStart(6)}`);
+			for (let i = 0; i < Math.min(5, metadataEntries.length); i++) {
+				const e = metadataEntries[i];
+				console.log(
+					`    ${i.toString().padStart(4)} ${e.name.padEnd(30)} 0x${e.offset.toString(16).padStart(6, '0')} ${e.width.toString().padStart(6)} ${e.height.toString().padStart(6)}`
+				);
+			}
 		}
 
 		// Create output directory
@@ -452,12 +459,15 @@ export class ResourceExtractor {
 			// Get width/height from next entry
 			let width: number;
 			let height: number;
+			let whSource: string;
 			if (i + 1 < metadataEntries.length) {
 				width = metadataEntries[i + 1].width;
 				height = metadataEntries[i + 1].height;
+				whSource = `Entry[${i + 1}]`;
 			} else {
 				width = entry.width;
 				height = entry.height;
+				whSource = `Entry[${i}]`;
 			}
 
 			// Skip invalid entries
@@ -487,8 +497,6 @@ export class ResourceExtractor {
 				successCount++;
 
 				if (i < 12 || i % 200 === 0) {
-					const whSource =
-						i + 1 < metadataEntries.length ? `Entry[${i + 1}]` : `Entry[${i}]`;
 					console.log(
 						`  ${resourceId.toString().padStart(4)} ${name.padEnd(30)} ${width}x${height.toString().padStart(5)} (${whSource})   ✓`
 					);
