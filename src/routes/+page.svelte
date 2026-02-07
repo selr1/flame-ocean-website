@@ -17,7 +17,10 @@
 		name: string;
 		start: number;
 		end: number;
+		smallCount: number;
+		largeCount: number;
 		estimatedCount: number;
+		fontType: 'SMALL' | 'LARGE';
 	}
 
 	interface BitmapFileInfo {
@@ -31,7 +34,7 @@
 	interface TreeNode {
 		id: string;
 		label: string;
-		type: 'folder' | 'plane' | 'image';
+		type: 'folder' | 'font-type' | 'plane' | 'image';
 		data?: FontPlaneInfo | BitmapFileInfo;
 		children?: TreeNode[];
 	}
@@ -124,25 +127,53 @@
 
 	// Build font tree structure
 	function buildFontTree(planes: FontPlaneInfo[]) {
-		const fontNodes = planes
-			.filter((p) => p.estimatedCount > 0)
+		// Create SMALL font planes
+		const smallPlanes = planes
+			.filter((p) => p.smallCount > 0)
 			.map((plane) => ({
-				id: `plane-${plane.name}`,
-				label: `${plane.name} (${plane.estimatedCount})`,
+				id: `plane-small-${plane.name}`,
+				label: `${plane.name} (${plane.smallCount})`,
 				type: 'plane' as const,
-				data: plane,
+				data: { ...plane, fontType: 'SMALL' as const },
+				children: []
+			}));
+
+		// Create LARGE font planes
+		const largePlanes = planes
+			.filter((p) => p.largeCount > 0)
+			.map((plane) => ({
+				id: `plane-large-${plane.name}`,
+				label: `${plane.name} (${plane.largeCount})`,
+				type: 'plane' as const,
+				data: { ...plane, fontType: 'LARGE' as const },
 				children: []
 			}));
 
 		treeNodes = [
 			{
 				id: 'fonts',
-				label: 'Unicode Planes',
+				label: 'Fonts',
 				type: 'folder',
-				children: fontNodes
+				children: [
+					{
+						id: 'fonts-small',
+						label: 'SMALL Fonts',
+						type: 'font-type',
+						children: smallPlanes
+					},
+					{
+						id: 'fonts-large',
+						label: 'LARGE Fonts',
+						type: 'font-type',
+						children: largePlanes
+					}
+				]
 			},
 			...(treeNodes.length > 1 ? [treeNodes[1]] : []) // Preserve images if already added
 		];
+
+		// Auto-expand the font folders
+		expandedNodes = new Set(['fonts', 'fonts-small', 'fonts-large']);
 	}
 
 	// Build image tree structure
@@ -220,13 +251,14 @@
 		if (!worker || !firmwareData || isProcessing) return;
 
 		isProcessing = true;
-		statusMessage = `Extracting ${plane.name}...`;
+		statusMessage = `Extracting ${plane.name} (${plane.fontType})...`;
 		imageData = null; // Clear image data
 
 		worker.postMessage({
 			type: 'extractPlane',
 			id: 'extractPlane',
 			firmware: new Uint8Array(), // Worker uses cached data
+			fontType: plane.fontType,
 			planeName: plane.name,
 			start: plane.start,
 			end: plane.end
@@ -383,6 +415,7 @@
 						{:else if selectedNode.type === 'plane' && planeData}
 							<div class="plane-header">
 								<h2>{planeData.name}</h2>
+								<p>{(selectedNode.data as FontPlaneInfo).fontType} Fonts</p>
 								<p>U+{planeData.start.toString(16).toUpperCase()} - U+{planeData.end.toString(16).toUpperCase()}</p>
 								<p>{planeData.fonts.length} fonts found</p>
 							</div>
