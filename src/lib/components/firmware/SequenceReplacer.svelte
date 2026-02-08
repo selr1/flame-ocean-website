@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BitmapFileInfo } from "../../rse/types";
   import { extractFrames } from "../../rse/utils/video-extractor";
-  import { TreeView } from "../98css";
+  import { TreeView, LoadingWindow } from "../98css";
   import ImageRenderer from "./ImageRenderer.svelte";
 
   interface Props {
@@ -453,12 +453,7 @@
         </div>
 
         <div class="preview-area">
-          {#if isExtracting}
-            <div class="empty-msg extracting">
-              <p>Extracting frames from video...</p>
-              <progress></progress>
-            </div>
-          {:else if !selectedImage}
+          {#if !selectedImage}
             <div class="empty-msg">Select an image to replace</div>
           {:else}
             {#if (isFromVideo && sourceFiles.length > 0) || (!isFromVideo && sourceFileMap.size > 0)}
@@ -486,16 +481,13 @@
             <div class="preview-image">
               <div class="preview-column before-column">
                 <div class="preview-label">Before</div>
-                {#if isLoadingTarget || !targetImageData}
+                {#if !targetImageData}
                   <div class="canvas-wrapper">
                     <div class="canvas-placeholder">
                       <canvas
                         width={selectedImage.width * 2}
                         height={selectedImage.height * 2}
                       ></canvas>
-                      {#if isLoadingTarget}
-                        <span class="loading-text">Loading...</span>
-                      {/if}
                     </div>
                     <div class="image-info">{selectedImage.name} - {selectedImage.width}x{selectedImage.height}</div>
                   </div>
@@ -604,6 +596,14 @@
     </div>
   </div>
 </div>
+
+{#if isExtracting}
+  <LoadingWindow message="Extracting frames from video..." showProgress={true} />
+{/if}
+
+{#if isLoadingTarget}
+  <LoadingWindow message="Loading target image..." showProgress={false} />
+{/if}
 
 <style>
   .sequence-replacer {
@@ -863,16 +863,6 @@
     image-rendering: pixelated;
     max-width: 100%;
     height: auto;
-  }
-
-  .canvas-placeholder .loading-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #ffffff;
-    font-size: 12px;
-    pointer-events: none;
   }
 
   .canvas-wrapper {
