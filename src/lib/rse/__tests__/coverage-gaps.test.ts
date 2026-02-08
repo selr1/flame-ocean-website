@@ -307,7 +307,7 @@ describe('Concurrent Modification Tests', () => {
 
 			// Create test pixels
 			const pixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+				Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 			);
 
 			// Write from extractor1
@@ -339,10 +339,10 @@ describe('Concurrent Modification Tests', () => {
 
 			// Write different characters from each instance
 			const pixels1: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => x === 0)
+				Array.from({ length: 16 }, (_, x) => x === 0)
 			);
 			const pixels2: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => x === 14)
+				Array.from({ length: 16 }, (_, x) => x === 14)
 			);
 
 			extractor1.replaceFontFromPixels(0x0041, 'SMALL', pixels1); // 'A'
@@ -603,23 +603,23 @@ describe('Property-Based Tests for Font Encoding/Decoding', () => {
 				const patterns: PixelData[] = [
 					// Checkerboard (~50% filled)
 					Array.from({ length: 16 }, (_, y) =>
-						Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+						Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 					),
 					// Vertical stripes (~33% filled)
 					Array.from({ length: 16 }, (_, y) =>
-						Array.from({ length: 15 }, (_, x) => x % 3 === 0)
+						Array.from({ length: 16 }, (_, x) => x % 3 === 0)
 					),
 					// Horizontal stripes (~33% filled)
 					Array.from({ length: 16 }, (_, y) =>
-						Array.from({ length: 15 }, (_, x) => y % 3 === 0)
+						Array.from({ length: 16 }, (_, x) => y % 3 === 0)
 					),
 					// X pattern (~50% filled)
 					Array.from({ length: 16 }, (_, y) =>
-						Array.from({ length: 15 }, (_, x) => x === y || x + y === 14)
+						Array.from({ length: 16 }, (_, x) => x === y || x + y === 14)
 					),
 					// Diagonal stripes (~33% filled)
 					Array.from({ length: 16 }, (_, y) =>
-						Array.from({ length: 15 }, (_, x) => (x + y) % 3 === 0)
+						Array.from({ length: 16 }, (_, x) => (x + y) % 3 === 0)
 					)
 				];
 
@@ -664,7 +664,7 @@ describe('Property-Based Tests for Font Encoding/Decoding', () => {
 			for (const lookupVal of lookupValues) {
 				// Create a pattern with ~50% density
 				const pixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => {
+					Array.from({ length: 16 }, (_, x) => {
 						const hash = (x * 31 + y * 17) % 100;
 						return hash < 50;
 					})
@@ -740,7 +740,7 @@ describe('Property-Based Tests for Font Encoding/Decoding', () => {
 	describe('Idempotence of encodeV8', () => {
 		it('should produce same result when encoding twice', () => {
 			const pixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+				Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 			);
 
 			const lookupVal = 0x18; // Some configuration
@@ -763,7 +763,7 @@ describe('Property-Based Tests for Font Encoding/Decoding', () => {
 			// Create a minimal valid pattern (~7% fill, above 1% threshold)
 			// Set 2 pixels per row, which gives ~13% fill ratio
 			const pixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => x === 0 || x === 7)
+				Array.from({ length: 16 }, (_, x) => x === 0 || x === 7)
 			);
 
 			// Encode and decode
