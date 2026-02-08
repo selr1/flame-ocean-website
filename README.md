@@ -53,7 +53,7 @@ This tool is provided as-is, without any warranty or support. I will not provide
 - Recovery guidance for bricked devices
 - Pay you for the broken device
 
-Complaining to me about bricked devices will only earn you my scorn.
+Complaining to me about bricked devices will only earn you my scorn σ`∀´) .
 
 ## Development
 
