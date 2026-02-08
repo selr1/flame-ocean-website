@@ -415,14 +415,17 @@
               <div class="preview-column before-column">
                 <div class="preview-label">Before</div>
                 {#if isLoadingTarget || !targetImageData}
-                  <div class="canvas-placeholder">
-                    <canvas
-                      width={selectedImage.width * 2}
-                      height={selectedImage.height * 2}
-                    ></canvas>
-                    {#if isLoadingTarget}
-                      <span class="loading-text">Loading...</span>
-                    {/if}
+                  <div class="canvas-wrapper">
+                    <div class="canvas-placeholder">
+                      <canvas
+                        width={selectedImage.width * 2}
+                        height={selectedImage.height * 2}
+                      ></canvas>
+                      {#if isLoadingTarget}
+                        <span class="loading-text">Loading...</span>
+                      {/if}
+                    </div>
+                    <div class="image-info">{selectedImage.name} - {selectedImage.width}x{selectedImage.height}</div>
                   </div>
                 {:else}
                   <ImageRenderer
@@ -674,6 +677,9 @@
     text-align: center;
     cursor: pointer;
     min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .drop-zone:hover {
@@ -792,6 +798,19 @@
     color: #ffffff;
     font-size: 12px;
     pointer-events: none;
+  }
+
+  .canvas-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .canvas-wrapper .image-info {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #000000;
+    text-align: center;
   }
 
   .preview-column :global(.image-container) {
