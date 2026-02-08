@@ -53,11 +53,19 @@
       groupMap.get(groupKey.prefix)!.push(img);
     }
 
-    // Convert to array and sort
+    // Convert to array, validate dimensions, filter single-file groups, and sort
     return Array.from(groupMap.entries())
+      .filter(([_, imgs]) => {
+        // Must have multiple files
+        if (imgs.length <= 1) return false;
+
+        // All images in the group must have consistent dimensions
+        const firstDim = `${imgs[0].width}x${imgs[0].height}`;
+        return imgs.every(img => `${img.width}x${img.height}` === firstDim);
+      })
       .map(([prefix, imgs]) => ({
         prefix,
-        displayName: prefix,
+        displayName: `${prefix} (${imgs[0].width}x${imgs[0].height})`,
         images: imgs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       }))
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -65,8 +73,8 @@
 
   // Extract group prefix from filename (e.g., "Z_POWERON0_(0,0).BMP" -> "Z_POWERON")
   function extractGroupKey(filename: string): { prefix: string; number: string } {
-    // Pattern 1: Z_POWERON0_(0,0).BMP -> prefix: Z_POWERON
-    const match1 = filename.match(/^(.+?)(\d+)[(](\d+),(\d+)[)][.]/);
+    // Pattern 1: Z_POWERON0_(0,0).BMP -> prefix: Z_POWERON (note the underscore before (x,y))
+    const match1 = filename.match(/^(.+?)(\d+)_\((\d+),(\d+)\)\./);
     if (match1) {
       return { prefix: match1[1], number: match1[2] };
     }
