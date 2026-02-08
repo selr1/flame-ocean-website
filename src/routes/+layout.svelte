@@ -3,8 +3,6 @@
 	import '98.css';
 
 	let { children } = $props();
-
-
 </script>
 
 <svelte:head>

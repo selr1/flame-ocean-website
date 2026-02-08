@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BitmapFileInfo } from '../../rse/types';
   import { extractFrames } from '../../rse/utils/video-extractor';
+  import { WarningWindow } from '../98css';
 
   interface Props {
     targetImages: BitmapFileInfo[];
@@ -13,6 +14,9 @@
   let sourceFiles = $state<File[]>([]);
   let fileInput: HTMLInputElement;
   let isExtracting = $state(false);
+  let showError = $state(false);
+  let errorTitle = $state('Error');
+  let errorMessage = $state('');
 
   // Auto-map sources to targets
   let mappings = $derived.by(() => {
@@ -37,7 +41,7 @@
 
       // Check for video file
       const videoFile = files.find(f => f.type.startsWith('video/'));
-      
+
       if (videoFile) {
           isExtracting = true;
           try {
@@ -46,13 +50,19 @@
               sourceFiles = frames;
           } catch (e) {
               console.error("Failed to extract frames", e);
-              alert("Failed to extract frames from video: " + (e instanceof Error ? e.message : String(e)));
+              errorTitle = "Video Extraction Failed";
+              errorMessage = "Failed to extract frames from video: " + (e instanceof Error ? e.message : String(e));
+              showError = true;
           } finally {
               isExtracting = false;
           }
       } else {
           sourceFiles = files;
       }
+  }
+
+  function handleErrorClose() {
+      showError = false;
   }
 
   function handleFileSelect(e: Event) {
@@ -166,6 +176,16 @@
     </div>
   </div>
 </div>
+
+{#if showError}
+  <WarningWindow
+    title={errorTitle}
+    message={errorMessage}
+    icon="error"
+    showCancel={false}
+    onconfirm={handleErrorClose}
+  />
+{/if}
 
 <style>
   .sequence-replacer {
