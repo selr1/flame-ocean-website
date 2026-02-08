@@ -11,7 +11,7 @@
   } from "$lib/components/98css";
   import FontGridRenderer from "$lib/components/firmware/FontGridRenderer.svelte";
   import ImageRenderer from "$lib/components/firmware/ImageRenderer.svelte";
-  import SequenceReplacer from "$lib/components/firmware/SequenceReplacer.svelte";
+  import SequenceReplacerWindow from "$lib/components/firmware/SequenceReplacerWindow.svelte";
   import FirmwareWorker from "$lib/workers/firmware-worker.ts?worker";
   import {
     initDebugShortcut,
@@ -56,17 +56,8 @@
   let progress = $state(0);
   let statusMessage = $state("Ready to load firmware");
   let selectedNode = $state<TreeNode | null>(null);
-  let selectedNodeIds = $state(new Set<string>());
   let expandedNodes = $state(new Set<string>());
   let treeNodes = $state<TreeNode[]>([]);
-  
-  // Derived state for multi-selection
-  let selectedImages = $derived(
-    Array.from(selectedNodeIds)
-        .map(id => findNodeById(treeNodes, id))
-        .filter(n => n && n.type === 'image')
-        .map(n => n!.data as BitmapFileInfo)
-  );
 
   let imageList = $state<BitmapFileInfo[]>([]);
   let planeData = $state<{
@@ -93,6 +84,9 @@
 
   // Track replaced images - use array for better Svelte 5 reactivity
   let replacedImages = $state<string[]>([]);
+
+  // Show sequence replacer mode
+  let showSequenceReplacer = $state(false);
 
   // File input
   // svelte-ignore non_reactive_update
@@ -295,8 +289,7 @@
       ...(treeNodes.length > 1 ? [treeNodes[1]] : []), // Preserve images if already added
     ];
 
-    // Auto-expand the font folders
-    expandedNodes = new Set(["fonts", "fonts-small", "fonts-large"]);
+    // Keep tree nodes collapsed by default
   }
 
   // Build image tree structure
@@ -360,68 +353,11 @@
     return null;
   }
 
-  // Helper to get all visible nodes in flattened order for Shift selection
-  function getVisibleNodes(nodes: TreeNode[], expanded: Set<string>): TreeNode[] {
-    let visible: TreeNode[] = [];
-    for (const node of nodes) {
-      visible.push(node);
-      if (node.children && expanded.has(node.id)) {
-        visible = [...visible, ...getVisibleNodes(node.children, expanded)];
-      }
-    }
-    return visible;
-  }
-
   // Handle tree node selection from TreeView onSelect
-  function handleSelectNode(nodeId: string, e?: MouseEvent | KeyboardEvent) {
+  function handleSelectNode(nodeId: string) {
     const node = findNodeById(treeNodes, nodeId);
-    if (!node) return;
-
-    if (e && (e instanceof MouseEvent || e instanceof KeyboardEvent)) {
-      const ctrlKey = e.ctrlKey || e.metaKey;
-      const shiftKey = e.shiftKey;
-
-      if (shiftKey && selectedNodeIds.size > 0) {
-        // Range selection
-        const visibleNodes = getVisibleNodes(treeNodes, expandedNodes);
-        const lastSelectedId = Array.from(selectedNodeIds).pop();
-        const startIdx = visibleNodes.findIndex(n => n.id === lastSelectedId);
-        const endIdx = visibleNodes.findIndex(n => n.id === nodeId);
-        
-        if (startIdx !== -1 && endIdx !== -1) {
-          const [min, max] = [Math.min(startIdx, endIdx), Math.max(startIdx, endIdx)];
-          const range = visibleNodes.slice(min, max + 1).map(n => n.id);
-          const newSet = new Set(selectedNodeIds);
-           range.forEach(id => newSet.add(id));
-           selectedNodeIds = newSet;
-        }
-      } else if (ctrlKey) {
-        // Toggle selection
-        const newSet = new Set(selectedNodeIds);
-        if (newSet.has(nodeId)) {
-          newSet.delete(nodeId);
-        } else {
-          newSet.add(nodeId);
-        }
-        selectedNodeIds = newSet;
-      } else {
-        // Single selection
-        selectedNodeIds = new Set([nodeId]);
-      }
-    } else {
-        // Fallback for programmatic or basic selection
-        selectedNodeIds = new Set([nodeId]);
-    }
-
-    // Update main view based on selection
-    if (selectedNodeIds.size === 1) {
-       handleNodeClick(node);
-    } else if (selectedNodeIds.size > 1) {
-       // Multiple selected: Clear single view
-       planeData = null;
-       imageData = null;
-       selectedNode = null; // Or keep last clicked?
-       // We will handle multi-selection view later (SequenceReplacer)
+    if (node) {
+      handleNodeClick(node);
     }
   }
 
@@ -1065,7 +1001,6 @@
     treeNodes = [];
     imageList = [];
     selectedNode = null;
-    selectedNodeIds = new Set();
     planeData = null;
     imageData = null;
     statusMessage = "Ready to load firmware";
@@ -1130,7 +1065,7 @@
     {/if}
 
     <!-- Main Browser Interface -->
-    {#if firmwareData && treeNodes.length > 0}
+    {#if firmwareData && treeNodes.length > 0 && !showSequenceReplacer}
       <Window
         title="Resource Browser"
         class="browser-window"
@@ -1175,6 +1110,15 @@
             >
               <img src="/document-edit.png" alt="" class="toolbar-icon" />
             </button>
+            <button
+              type="button"
+              class="toolbar-button"
+              title="Replace Image Sequence"
+              onclick={() => showSequenceReplacer = !showSequenceReplacer}
+              disabled={!firmwareData || imageList.length === 0}
+            >
+              <img src="/video.png" alt="" class="toolbar-icon-small" />
+            </button>
             <input
               type="file"
               accept=".bmp,.png,.jpg,.jpeg"
@@ -1192,8 +1136,8 @@
               <TreeView
                 nodes={treeNodes}
                 expanded={expandedNodes}
-                selected={selectedNodeIds}
-                onSelect={(nodeId, e) => handleSelectNode(nodeId, e)}
+                selected={selectedNode?.id ?? ''}
+                onSelect={(nodeId) => handleSelectNode(nodeId)}
                 {replacedImages}
               />
             </div>
@@ -1208,13 +1152,7 @@
               role="region"
               aria-label="Image viewer - drop images here to replace"
             >
-              {#if selectedImages.length > 1}
-                 <SequenceReplacer 
-                    targetImages={selectedImages} 
-                    onApply={handleSequenceReplace} 
-                    onCancel={() => handleSelectNode(Array.from(selectedNodeIds)[0])} 
-                 />
-              {:else if selectedNode}
+              {#if selectedNode}
                 {#if isProcessing}
                   <div class="empty-state">
                     <p>Loading {selectedNode.type}...</p>
@@ -1254,6 +1192,16 @@
           </div>
         </WindowBody>
       </Window>
+    {/if}
+
+    <!-- Sequence Replacer Window -->
+    {#if firmwareData && treeNodes.length > 0 && showSequenceReplacer}
+      <SequenceReplacerWindow
+        targetImages={imageList}
+        worker={worker!}
+        onApply={handleSequenceReplace}
+        onClose={() => showSequenceReplacer = false}
+      />
     {/if}
   </div>
 
@@ -1426,6 +1374,14 @@
   .toolbar-icon {
     width: 24px;
     height: 24px;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  .toolbar-icon-small {
+    width: 16px;
+    height: 16px;
+    margin: 4px;
     image-rendering: pixelated;
     pointer-events: none;
   }

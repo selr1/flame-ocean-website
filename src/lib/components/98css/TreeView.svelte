@@ -15,14 +15,14 @@
 		class?: ClassValue;
 		nodes: TreeNode[];
 		expanded?: Set<string>;
-		selected?: Set<string>;
+		selected?: string;
 		replacedImages?: string[];
 		onToggle?: (nodeId: string) => void;
-		onSelect?: (nodeId: string, e?: MouseEvent | KeyboardEvent) => void;
+		onSelect?: (nodeId: string) => void;
 		children?: Snippet;
 	}
 
-	let { class: className, nodes, expanded = $bindable(new Set<string>()), selected = $bindable(new Set<string>()), replacedImages = [], onToggle, onSelect, children }: Props =
+	let { class: className, nodes, expanded = $bindable(new Set<string>()), selected = $bindable(''), replacedImages = [], onToggle, onSelect, children }: Props =
 		$props();
 
 	const treeViewClass = $derived(clsx('tree-view', className));
@@ -31,7 +31,7 @@
 	let programmaticUpdates = $state(new Set<string>());
 
 	function isSelected(nodeId: string): boolean {
-		return selected.has(nodeId);
+		return selected === nodeId;
 	}
 
 	function toggleNode(nodeId: string): void {
@@ -67,7 +67,7 @@
 	function handleLeafKeydown(nodeId: string, e: KeyboardEvent) {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			onSelect?.(nodeId, e);
+			onSelect?.(nodeId);
 		}
 	}
 </script>
@@ -94,7 +94,7 @@
 															class="leaf-node"
 															class:selected={isSelected(grandchild.id)}
 															class:replaced={replacedImages.includes(grandchild.label)}
-															onclick={(e) => onSelect?.(grandchild.id, e)}
+															onclick={() => onSelect?.(grandchild.id)}
 															onkeydown={(e) => handleLeafKeydown(grandchild.id, e)}
 															role="button"
 															tabindex="0"
@@ -111,7 +111,7 @@
 										class="leaf-node"
 										class:selected={isSelected(child.id)}
 										class:replaced={replacedImages.includes(child.label)}
-										onclick={(e) => onSelect?.(child.id, e)}
+										onclick={() => onSelect?.(child.id)}
 										onkeydown={(e) => handleLeafKeydown(child.id, e)}
 										role="button"
 										tabindex="0"
@@ -128,7 +128,7 @@
 					class="leaf-node"
 					class:selected={isSelected(node.id)}
 					class:replaced={replacedImages.includes(node.label)}
-					onclick={(e) => onSelect?.(node.id, e)}
+					onclick={() => onSelect?.(node.id)}
 					onkeydown={(e) => handleLeafKeydown(node.id, e)}
 					role="button"
 					tabindex="0"
@@ -147,6 +147,8 @@
 	.tree-view {
 		max-height: 100%;
 		overflow-y: auto;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
 	.leaf-node {
