@@ -289,8 +289,7 @@
       ...(treeNodes.length > 1 ? [treeNodes[1]] : []), // Preserve images if already added
     ];
 
-    // Auto-expand the font folders
-    expandedNodes = new Set(["fonts", "fonts-small", "fonts-large", "images"]);
+    // Keep tree nodes collapsed by default
   }
 
   // Build image tree structure
@@ -318,9 +317,6 @@
     } else {
       treeNodes = [...treeNodes, imagesNode];
     }
-
-    // Ensure images folder is expanded so images are visible for range selection
-    expandedNodes = new Set([...expandedNodes, "images"]);
   }
 
   // Handle tree node click
