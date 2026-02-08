@@ -414,9 +414,17 @@
             <div class="preview-image">
               <div class="preview-column before-column">
                 <div class="preview-label">Before</div>
-                {#if isLoadingTarget}
-                  <div class="preview-placeholder">Loading...</div>
-                {:else if targetImageData}
+                {#if isLoadingTarget || !targetImageData}
+                  <div class="canvas-placeholder">
+                    <canvas
+                      width={selectedImage.width * 2}
+                      height={selectedImage.height * 2}
+                    ></canvas>
+                    {#if isLoadingTarget}
+                      <span class="loading-text">Loading...</span>
+                    {/if}
+                  </div>
+                {:else}
                   <ImageRenderer
                     name={targetImageData.name}
                     width={targetImageData.width}
@@ -424,13 +432,6 @@
                     rgb565Data={targetImageData.rgb565Data}
                     zoom={2}
                   />
-                {:else}
-                  <div class="preview-placeholder">
-                    {selectedImage.name}
-                    <div class="dim">
-                      {selectedImage.width}x{selectedImage.height}
-                    </div>
-                  </div>
                 {/if}
               </div>
               <div class="preview-column after-column">
@@ -769,6 +770,28 @@
     color: #666;
     font-size: 11px;
     text-align: center;
+  }
+
+  .canvas-placeholder {
+    position: relative;
+    display: inline-block;
+  }
+
+  .canvas-placeholder canvas {
+    display: block;
+    background-color: #000000;
+    border: 2px solid #808080;
+    image-rendering: pixelated;
+  }
+
+  .canvas-placeholder .loading-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 12px;
+    pointer-events: none;
   }
 
   .preview-column :global(.image-container) {
