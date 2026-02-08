@@ -1198,6 +1198,7 @@
     {#if firmwareData && treeNodes.length > 0 && showSequenceReplacer}
       <SequenceReplacerWindow
         targetImages={imageList}
+        worker={worker!}
         onApply={handleSequenceReplace}
         onClose={() => showSequenceReplacer = false}
       />
