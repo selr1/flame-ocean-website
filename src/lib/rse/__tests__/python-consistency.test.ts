@@ -169,12 +169,12 @@ describe('Python Consistency Tests - Font Decoding', () => {
 				}
 			} else if (testCase.name.includes('write_bmp_header_only')) {
 				// Test monochrome BMP header creation
-				const width = input.width ?? 15;
+				const width = input.width ?? 16;
 				const height = input.height ?? 16;
 				const expectedOutput = testCase.output as { header: number[]; header_size: number };
 
 				// Create a simple pixel pattern
-				const pixels: PixelData = [];
+				const pixels: boolean[][] = [];
 				for (let y = 0; y < height; y++) {
 					const row: boolean[] = [];
 					for (let x = 0; x < width; x++) {
@@ -183,7 +183,7 @@ describe('Python Consistency Tests - Font Decoding', () => {
 					pixels.push(row);
 				}
 
-				const result = createMonoBmp(pixels, width, height);
+				const result = createMonoBmp(pixels as PixelData, width, height);
 
 				// Check header matches (first 62 bytes are header)
 				const resultHeader = Array.from(result.slice(0, 62));
@@ -192,7 +192,7 @@ describe('Python Consistency Tests - Font Decoding', () => {
 			} else if (testCase.name.includes('encode_mono_bmp_pixels')) {
 				// Test monochrome BMP pixel encoding
 				const pixels = input.pixels as PixelData;
-				const width = input.width ?? 15;
+				const width = input.width ?? 16;
 				const height = input.height ?? 16;
 				const expectedOutput = testCase.output as { pixel_data: number[] };
 

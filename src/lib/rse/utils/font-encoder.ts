@@ -33,7 +33,7 @@ export function parseLookupConfig(lookupVal: number): FontEncodingConfig {
 
 /**
  * Encode pixel data to font chunk using v8 algorithm (inverse of decodeV8)
- * @param pixels - 2D pixel array (16 rows, each with 15 bits)
+ * @param pixels - 2D pixel array (16 rows, each with 16 bits)
  * @param lookupVal - Lookup table value for encoding configuration
  * @returns Encoded font data chunk (32 bytes for SMALL, 33 bytes for LARGE)
  * @throws Error if pixel data is invalid
@@ -45,22 +45,22 @@ export function encodeV8(pixels: PixelData, lookupVal: number): Uint8Array {
 	}
 
 	for (let i = 0; i < pixels.length; i++) {
-		if (pixels[i].length !== 15) {
-			throw new Error(`Invalid pixel data: expected 15 pixels per row, got ${pixels[i].length} in row ${i}`);
+		if (pixels[i].length !== 16) {
+			throw new Error(`Invalid pixel data: expected 16 pixels per row, got ${pixels[i].length} in row ${i}`);
 		}
 	}
 
 	const config = parseLookupConfig(lookupVal);
 	const { swMcuBits, swMcuHwSwap, swMcuByteSwap } = config;
 
-	// Encode each row to 2 bytes (16 bits, but we only use 15)
+	// Encode each row to 2 bytes (16 bits)
 	const chunk = new Uint8Array(32);
 
 	for (let row = 0; row < 16; row++) {
-		// Convert 15 pixels to a 16-bit value (left-aligned, bits 15-1)
-		// decodeV8 extracts bits 15-1 (not bit 0), so we put our data there
+		// Convert 16 pixels to a 16-bit value (bits 15-0)
+		// decodeV8 extracts bits 15-0, so we put our data there
 		let pixelValue = 0;
-		for (let bit = 0; bit < 15; bit++) {
+		for (let bit = 0; bit < 16; bit++) {
 			if (pixels[row][bit]) {
 				pixelValue |= (1 << (15 - bit));
 			}

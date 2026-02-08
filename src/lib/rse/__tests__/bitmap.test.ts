@@ -61,13 +61,13 @@ describe('createMonoBmp', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
 			const row: boolean[] = [];
-			for (let x = 0; x < 15; x++) {
+			for (let x = 0; x < 16; x++) {
 				row.push((x + y) % 2 === 0);
 			}
 			pixels.push(row);
 		}
 
-		const result = createMonoBmp(pixels, 15, 16);
+		const result = createMonoBmp(pixels, 16, 16);
 
 		// Check BMP signature
 		expect(result[0]).toBe(0x42); // 'B'
@@ -98,7 +98,7 @@ describe('createMonoBmp', () => {
 	it('should create valid BMP structure', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
-			pixels.push(new Array(15).fill(false));
+			pixels.push(new Array(16).fill(false));
 		}
 
 		const result = createMonoBmp(pixels);
@@ -120,7 +120,7 @@ describe('isValidFontData', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
 			const row: boolean[] = [];
-			for (let x = 0; x < 15; x++) {
+			for (let x = 0; x < 16; x++) {
 				row.push(Math.random() < 0.3); // ~30% fill
 			}
 			pixels.push(row);
@@ -133,7 +133,7 @@ describe('isValidFontData', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
 			const row: boolean[] = [];
-			for (let x = 0; x < 15; x++) {
+			for (let x = 0; x < 16; x++) {
 				row.push(Math.random() < 0.4); // ~40% fill
 			}
 			pixels.push(row);
@@ -145,7 +145,7 @@ describe('isValidFontData', () => {
 	it('should reject empty data', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
-			pixels.push(new Array(15).fill(false));
+			pixels.push(new Array(16).fill(false));
 		}
 
 		expect(isValidFontData(pixels, 'SMALL')).toBe(false);
@@ -155,7 +155,7 @@ describe('isValidFontData', () => {
 	it('should reject too dense data', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
-			pixels.push(new Array(15).fill(true)); // 100% fill
+			pixels.push(new Array(16).fill(true)); // 100% fill
 		}
 
 		expect(isValidFontData(pixels, 'SMALL')).toBe(false);
@@ -166,7 +166,7 @@ describe('isValidFontData', () => {
 		const pixels: boolean[][] = [];
 		for (let y = 0; y < 16; y++) {
 			const row: boolean[] = [];
-			for (let x = 0; x < 15; x++) {
+			for (let x = 0; x < 16; x++) {
 				row.push(false); // No pixels set
 			}
 			pixels.push(row);

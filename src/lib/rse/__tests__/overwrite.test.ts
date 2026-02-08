@@ -54,7 +54,7 @@ function createTestFirmware(): Uint8Array {
 	const pixels: PixelData = [];
 	for (let y = 0; y < 16; y++) {
 		const row: boolean[] = [];
-		for (let x = 0; x < 15; x++) {
+		for (let x = 0; x < 16; x++) {
 			row.push(aPattern[y * 16 + x] === 1);
 		}
 		(pixels as boolean[][]).push(row);
@@ -116,7 +116,7 @@ function createTestPattern(fillAll: boolean): PixelData {
 	const result: boolean[][] = [];
 	for (let y = 0; y < 16; y++) {
 		const row: boolean[] = [];
-		for (let x = 0; x < 15; x++) {
+		for (let x = 0; x < 16; x++) {
 			// Create a checkerboard-like pattern (50% filled)
 			row.push(fillAll ? (x + y) % 2 === 0 : false);
 		}
@@ -131,7 +131,7 @@ function createSimpleFontPattern(): PixelData {
 	const result: boolean[][] = [];
 	for (let y = 0; y < 16; y++) {
 		const row: boolean[] = [];
-		for (let x = 0; x < 15; x++) {
+		for (let x = 0; x < 16; x++) {
 			// X pattern in center
 			if ((x === y) || (x + y === 14)) {
 				row.push(true);
@@ -186,7 +186,7 @@ describe('FontExtractor Overwrite Tests', () => {
 			const pixels = extractor.readFontAsPixels(0x0041, 'SMALL');
 			expect(pixels).not.toBeNull();
 			expect(pixels?.length).toBe(16);
-			expect(pixels?.[0].length).toBe(15);
+			expect(pixels?.[0].length).toBe(16);
 		});
 
 		it('should return null for invalid character', () => {
@@ -236,7 +236,7 @@ describe('FontExtractor Overwrite Tests', () => {
 			expect(originalPixels).not.toBeNull();
 
 			// Convert to BMP
-			const bmpData = createMonoBmp(originalPixels!, 15, 16);
+			const bmpData = createMonoBmp(originalPixels!, 16, 16);
 			expect(bmpData).not.toBeNull();
 
 			// Write from BMP
@@ -311,7 +311,7 @@ describe('FontExtractor Overwrite Tests', () => {
 
 			// First modification: set to checkerboard pattern
 			let modifiedPixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+				Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 			);
 			let result = extractor.replaceFontFromPixels(0x0041, 'SMALL', modifiedPixels);
 			expect(result).toBe(true);
@@ -353,7 +353,7 @@ describe('FontExtractor Overwrite Tests', () => {
 			for (let y = 0; y < 10; y++) {
 				// Wrong: 10 rows instead of 16
 				const row: boolean[] = [];
-				for (let x = 0; x < 15; x++) {
+				for (let x = 0; x < 16; x++) {
 					row.push(false);
 				}
 				invalidPixels.push(row);
@@ -380,7 +380,7 @@ describe('FontExtractor Overwrite Tests', () => {
 
 			// Modify font with a clearly different pattern (all false in center, true on edges)
 			const modifiedPixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => x < 2 || x > 12 || y < 2 || y > 13)
+				Array.from({ length: 16 }, (_, x) => x < 2 || x > 12 || y < 2 || y > 13)
 			);
 
 			const success = extractor.replaceFontFromPixels(0x0041, 'SMALL', modifiedPixels);
@@ -609,15 +609,15 @@ describe('FontEncoder Tests', () => {
 			const patterns: PixelData[] = [
 				// Checkerboard pattern
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+					Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 				),
 				// Vertical stripes
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => x % 3 === 0)
+					Array.from({ length: 16 }, (_, x) => x % 3 === 0)
 				),
 				// Horizontal stripes
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => y % 3 === 0)
+					Array.from({ length: 16 }, (_, x) => y % 3 === 0)
 				)
 			];
 
@@ -653,7 +653,7 @@ describe('FontEncoder Tests', () => {
 	 */
 	describe('encodeV8 with all lookup configurations', () => {
 		const testPattern: PixelData = Array.from({ length: 16 }, (_, y) =>
-			Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+			Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 		);
 
 		// Test all 8 combinations of swMcuBits, swMcuHwSwap, swMcuByteSwap
@@ -707,7 +707,7 @@ describe('FontEncoder Tests', () => {
 		it('should preserve all pixel values in round-trip for known good configurations', () => {
 			// Create a pattern that tests all bit positions
 			const specificPattern: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => {
+				Array.from({ length: 16 }, (_, x) => {
 					// Each position has a unique pattern (checkerboard-like, ~50% filled)
 					return (x + y) % 2 === 0;
 				})
@@ -740,7 +740,7 @@ describe('FontEncoder Tests', () => {
 
 			// Every single pixel must match
 			for (let y = 0; y < 16; y++) {
-				for (let x = 0; x < 15; x++) {
+				for (let x = 0; x < 16; x++) {
 					expect(decodedPixels![y][x]).toBe(specificPattern[y][x]);
 				}
 			}
@@ -754,7 +754,7 @@ describe('BMP Parser Tests', () => {
 			const originalPixels = createSimpleFontPattern();
 
 			// Create BMP
-			const bmpData = createMonoBmp(originalPixels, 15, 16);
+			const bmpData = createMonoBmp(originalPixels, 16, 16);
 
 			// Parse BMP
 			const parsedPixels = parseMonoBmp(bmpData);
@@ -767,20 +767,20 @@ describe('BMP Parser Tests', () => {
 			const patterns: PixelData[] = [
 				// Checkerboard pattern
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+					Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 				),
 				// Vertical stripes
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => x % 3 === 0)
+					Array.from({ length: 16 }, (_, x) => x % 3 === 0)
 				),
 				// All false (empty)
 				Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, () => false)
+					Array.from({ length: 16 }, () => false)
 				)
 			];
 
 			for (const pattern of patterns) {
-				const bmpData = createMonoBmp(pattern, 15, 16);
+				const bmpData = createMonoBmp(pattern, 16, 16);
 				const parsedPixels = parseMonoBmp(bmpData);
 
 				expect(parsedPixels).not.toBeNull();
@@ -873,7 +873,7 @@ describe('Validation Tests', () => {
 
 				// Write should work
 				const testPixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => (x + y + unicode) % 2 === 0)
+					Array.from({ length: 16 }, (_, x) => (x + y + unicode) % 2 === 0)
 				);
 
 				const result = extractor.replaceFontFromPixels(unicode, 'SMALL', testPixels);
@@ -893,7 +893,7 @@ describe('Validation Tests', () => {
 
 			// Create a pattern that's ~50% filled (valid)
 			const validPattern: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+				Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 			);
 
 			// Encode and place in firmware
@@ -918,7 +918,7 @@ describe('Validation Tests', () => {
 
 			// All-zero pattern should be rejected (validation)
 			const allZero: PixelData = Array.from({ length: 16 }, () =>
-				Array.from({ length: 15 }, () => false)
+				Array.from({ length: 16 }, () => false)
 			);
 
 			// Try to replace with all-zero (should be rejected by validation)
@@ -947,7 +947,7 @@ describe('Validation Tests', () => {
 			const hugeUnicode = 0xFFFFF;
 
 			const testPixels: PixelData = Array.from({ length: 16 }, (_, y) =>
-				Array.from({ length: 15 }, (_, x) => (x + y) % 2 === 0)
+				Array.from({ length: 16 }, (_, x) => (x + y) % 2 === 0)
 			);
 
 			// Should fail (address out of bounds)
@@ -980,7 +980,7 @@ describe('Validation Tests', () => {
 			for (let i = 0; i < unicodes.length; i++) {
 				const unicode = unicodes[i];
 				const pattern: PixelData = Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => ((x + y + i) % 3) === 0)
+					Array.from({ length: 16 }, (_, x) => ((x + y + i) % 3) === 0)
 				);
 
 				extractor.replaceFontFromPixels(unicode, 'SMALL', pattern);
@@ -993,7 +993,7 @@ describe('Validation Tests', () => {
 			for (let i = 0; i < unicodes.length; i++) {
 				const unicode = unicodes[i];
 				const expectedPattern: PixelData = Array.from({ length: 16 }, (_, y) =>
-					Array.from({ length: 15 }, (_, x) => ((x + y + i) % 3) === 0)
+					Array.from({ length: 16 }, (_, x) => ((x + y + i) % 3) === 0)
 				);
 
 				const readBack = extractor.readFontAsPixels(unicode, 'SMALL');

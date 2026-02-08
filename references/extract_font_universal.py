@@ -736,12 +736,12 @@ class FontExtractor:
             if not ((sw_mcu_bits == 1) and (sw_mcu_byte_swap == 1)):
                 final_pixel = ((final_pixel & 0xFF) << 8) | ((final_pixel >> 8) & 0xFF)
 
-            row_bits = [(final_pixel >> bit) & 1 for bit in range(15, 0, -1)]
+            row_bits = [(final_pixel >> bit) & 1 for bit in range(15, -1, -1)]
             pixels.append(row_bits)
 
         return pixels
 
-    def write_bmp(self, path, pixels, width=15, height=16):
+    def write_bmp(self, path, pixels, width=16, height=16):
         """Write monochrome BMP file.
 
         Args:

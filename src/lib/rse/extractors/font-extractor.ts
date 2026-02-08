@@ -120,7 +120,7 @@ export class FontExtractor {
 			}
 
 			const rowBits: boolean[] = [];
-			for (let bit = 15; bit > 0; bit--) {
+			for (let bit = 15; bit >= 0; bit--) {
 				rowBits.push(((finalPixel >> bit) & 1) === 1);
 			}
 			pixels.push(rowBits);
@@ -213,7 +213,7 @@ export class FontExtractor {
 	 * Write BMP to file
 	 */
 	private writeBmp(path: string, pixels: PixelData): void {
-		const bmpData = createMonoBmp(pixels, 15, 16);
+		const bmpData = createMonoBmp(pixels, 16, 16);
 		fileIO.writeFileSync(path, bmpData);
 	}
 
@@ -302,7 +302,7 @@ export class FontExtractor {
 						const header = lookupVal & 0xff;
 						const filename = `${fontType}/${name}_U+${uni.toString(16).padStart(4, '0').toUpperCase()}_H${header.toString(16).padStart(2, '0')}.bmp`;
 
-						results.set(filename, createMonoBmp(pixels, 15, 16));
+						results.set(filename, createMonoBmp(pixels, 16, 16));
 					} catch {
 						continue;
 					}
@@ -460,7 +460,7 @@ export class FontExtractor {
 	 * Replace font data from pixel array
 	 * @param unicode - Unicode code point
 	 * @param fontType - "SMALL" or "LARGE"
-	 * @param pixels - Pixel data (16 rows x 15 columns)
+	 * @param pixels - Pixel data (16 rows x 16 columns)
 	 * @returns True if successful, false otherwise
 	 */
 	replaceFontFromPixels(unicode: number, fontType: 'SMALL' | 'LARGE', pixels: PixelData): boolean {

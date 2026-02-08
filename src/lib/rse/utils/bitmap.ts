@@ -52,13 +52,13 @@ export function convertToBmp(
 /**
  * Create a monochrome BMP image from pixel data
  * @param pixels - 2D array of boolean pixel values
- * @param width - Image width (default 15)
+ * @param width - Image width (default 16)
  * @param height - Image height (default 16)
  * @returns BMP file data
  */
 export function createMonoBmp(
 	pixels: PixelData,
-	width: number = 15,
+	width: number = 16,
 	height: number = 16
 ): Uint8Array {
 	const bfType = 0x4d42; // 'BM'
@@ -192,7 +192,7 @@ export function parseMonoBmp(bmpData: Uint8Array): PixelData | null {
 	if (bitsPerPixel !== 1) return null;
 	if (width <= 0 || height <= 0 || width > 100 || height !== 16) return null;
 
-	const pixels: PixelData = [];
+	const pixels: boolean[][] = [];
 	const rowBytes = ((width + 31) >> 5) << 2; // ((width + 31) / 32) * 4
 
 	// Read pixel data (bottom-up)
@@ -211,7 +211,7 @@ export function parseMonoBmp(bmpData: Uint8Array): PixelData | null {
 		pixels.push(row);
 	}
 
-	return pixels;
+	return pixels as PixelData;
 }
 
 /**

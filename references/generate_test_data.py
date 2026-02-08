@@ -225,13 +225,13 @@ def decode_v8(chunk, lookup_val):
         if not ((sw_mcu_bits == 1) and (sw_mcu_byte_swap == 1)):
             final_pixel = ((final_pixel & 0xFF) << 8) | ((final_pixel >> 8) & 0xFF)
 
-        row_bits = [(final_pixel >> bit) & 1 for bit in range(15, 0, -1)]
+        row_bits = [(final_pixel >> bit) & 1 for bit in range(15, -1, -1)]
         pixels.append(row_bits)
 
     return pixels
 
 
-def write_bmp_header_only(width=15, height=16):
+def write_bmp_header_only(width=16, height=16):
     """Generate monochrome BMP file header.
 
     Creates a BMP header for 1-bit per pixel monochrome images.
@@ -279,7 +279,7 @@ def write_bmp_header_only(width=15, height=16):
     return bytes(header)
 
 
-def encode_mono_bmp_pixels(pixels, width=15, height=16):
+def encode_mono_bmp_pixels(pixels, width=16, height=16):
     """Encode pixel data to monochrome BMP format.
 
     Converts a 2D pixel array into the BMP monochrome format where each row
