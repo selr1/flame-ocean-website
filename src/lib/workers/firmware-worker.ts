@@ -11,6 +11,8 @@ import {
 	ROCK26_SIGNATURE
 } from '../rse/utils/metadata.js';
 import { validateBitmapData } from '../rse/utils/font-encoder.js';
+import { convertToBmp } from '../rse/utils/bitmap.js';
+import JSZip from 'jszip';
 
 // Constants
 const SMALL_STRIDE = 32;
@@ -34,7 +36,7 @@ function swapBytes16Bit(data: Uint8Array): Uint8Array {
 
 // Worker message types
 interface WorkerRequest {
-	type: 'analyze' | 'listPlanes' | 'listImages' | 'extractPlane' | 'extractImage' | 'replaceImage' | 'replaceImages' | 'getFirmware';
+	type: 'analyze' | 'listPlanes' | 'listImages' | 'extractPlane' | 'extractImage' | 'replaceImage' | 'replaceImages' | 'getFirmware' | 'bundleImagesAsZip';
 	id: string;
 	firmware: Uint8Array;
 	fontType?: 'SMALL' | 'LARGE';
@@ -996,6 +998,139 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 					type: 'success',
 					id,
 					result: firmwareData
+				});
+				break;
+			}
+
+			case 'bundleImagesAsZip': {
+				if (!firmwareData) {
+					self.postMessage({ type: 'error', id, error: 'Firmware not analyzed. Call analyze first.' });
+					return;
+				}
+
+				self.postMessage({ type: 'progress', id, message: 'Collecting image list...' });
+
+				// Collect all images (similar to listImages)
+				const images: BitmapFileInfo[] = [];
+				const part5Offset = readU32LE(firmwareData, 0x14c);
+				const part5Size = readU32LE(firmwareData, 0x150);
+				const part5Data = firmwareData.slice(part5Offset, part5Offset + part5Size);
+
+				// Find ROCK26 table within Part 5
+				const rock26Offset = findBytes(part5Data, ROCK26_SIGNATURE);
+				if (rock26Offset === -1) {
+					self.postMessage({ type: 'error', id, error: 'Could not find ROCK26 signature' });
+					return;
+				}
+
+				// Find metadata table
+				const tableStart = findMetadataTableByRock26Anchor(part5Data, rock26Offset);
+				if (tableStart === null) {
+					self.postMessage({ type: 'error', id, error: 'Could not find metadata table' });
+					return;
+				}
+
+				// Parse all metadata entries
+				const allEntries = parseMetadataTable(part5Data, tableStart);
+
+				// Detect misalignment
+				const { misalignment, firstValidEntry } = detectOffsetMisalignment(
+					allEntries,
+					part5Data,
+					rock26Offset
+				);
+
+				// Build image list
+				const startIndex = firstValidEntry;
+				const endIndex = allEntries.length - (misalignment > 0 ? 1 : 0);
+
+				for (let i = startIndex; i < endIndex; i++) {
+					const entry = allEntries[i];
+
+					let width: number;
+					let height: number;
+					if (i + 1 < allEntries.length) {
+						width = allEntries[i + 1].width;
+						height = allEntries[i + 1].height;
+					} else {
+						width = entry.width;
+						height = entry.height;
+					}
+
+					let offset: number;
+					if (misalignment > 0) {
+						const targetIndex = i + misalignment;
+						if (targetIndex >= allEntries.length) continue;
+						offset = allEntries[targetIndex].offset;
+					} else if (misalignment < 0) {
+						const targetIndex = i + misalignment;
+						if (targetIndex < 0) continue;
+						offset = allEntries[targetIndex].offset;
+					} else {
+						offset = entry.offset;
+					}
+
+					if (offset === 0 || width <= 0 || height <= 0 || width > 10000 || height > 10000) {
+						continue;
+					}
+
+					images.push({
+						name: entry.name,
+						width,
+						height,
+						size: width * height * 2,
+						offset
+					});
+				}
+
+				if (images.length === 0) {
+					self.postMessage({ type: 'error', id, error: 'No images found in firmware' });
+					return;
+				}
+
+				self.postMessage({ type: 'progress', id, message: `Found ${images.length} images. Creating ZIP archive...` });
+
+				// Create ZIP file
+				const zip = new JSZip();
+
+				// Process each image
+				for (let i = 0; i < images.length; i++) {
+					const img = images[i];
+
+					// Update progress periodically
+					if (i % 10 === 0 || i === images.length - 1) {
+						self.postMessage({
+							type: 'progress',
+							id,
+							message: `Adding image ${i + 1}/${images.length}: ${img.name}...`
+						});
+					}
+
+					// Extract RGB565 data from Part 5
+					const rawSize = img.width * img.height * 2;
+					const rawRgb565 = part5Data.slice(img.offset!, img.offset! + rawSize);
+
+					// Convert to BMP
+					const bmpData = convertToBmp(rawRgb565, img.width, img.height);
+
+					if (!bmpData) {
+						console.warn(`Failed to convert ${img.name} to BMP`);
+						continue;
+					}
+
+					// Add to ZIP with .bmp extension
+					zip.file(`${img.name}.bmp`, bmpData);
+				}
+
+				self.postMessage({ type: 'progress', id, message: 'Generating ZIP file...' });
+
+				// Generate ZIP blob as ArrayBuffer
+				const zipBlob = await zip.generateAsync({ type: 'arraybuffer' });
+
+				self.postMessage({
+					type: 'success',
+					id,
+					result: new Uint8Array(zipBlob)
 				});
 				break;
 			}

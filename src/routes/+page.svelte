@@ -92,6 +92,10 @@
   let isDragOver = $state(false);
   let isImageDragOver = $state(false);
 
+  // Edit/Replacement file input (for multiple files)
+  // svelte-ignore non_reactive_update
+  let editFileInput: HTMLInputElement;
+
   // Debug mode tracking - use state with subscribe for proper reactivity
   let debug = $state(false);
   let debugAnimComplete = $state(true);
@@ -107,6 +111,21 @@
   let showLoadingWindow = $derived(
     isProcessing || (debug && !debugAnimComplete),
   );
+
+  // Update document title dynamically
+  $effect(() => {
+    if (!firmwareData && !isProcessing) {
+      document.title = "FlameOcean";
+    } else if (showLoadingWindow) {
+      document.title = "Loading - FlameOcean";
+    } else if (selectedNode?.type === "image" && imageData) {
+      document.title = `${imageData.name} - FlameOcean`;
+    } else if (selectedNode?.type === "plane" && planeData) {
+      document.title = `${planeData.name} (${planeData.fontType}) - FlameOcean`;
+    } else {
+      document.title = "Resource Browser - FlameOcean";
+    }
+  });
 
   // Initialize worker
   onMount(() => {
@@ -637,6 +656,58 @@
     }
   }
 
+  // Bundle all firmware images as ZIP
+  async function bundleImagesAsZip() {
+    if (!firmwareData || !worker) {
+      showWarningDialog("Export Error", "No firmware data to export.");
+      return;
+    }
+
+    isProcessing = true;
+    statusMessage = "Preparing image bundle...";
+
+    try {
+      // Request ZIP bundle from worker with progress tracking
+      const zipData = await new Promise<Uint8Array>((resolve, reject) => {
+        const handler = (e: MessageEvent) => {
+          const data = e.data;
+          if (data.id === "bundleImagesAsZip") {
+            // Only handle success/error, ignore progress
+            if (data.type === "success") {
+              worker!.removeEventListener("message", handler);
+              resolve(data.result as Uint8Array);
+            } else if (data.type === "error") {
+              worker!.removeEventListener("message", handler);
+              reject(new Error(data.error || "Failed to bundle images"));
+            }
+            // For progress messages, just continue waiting
+          }
+        };
+
+        worker!.addEventListener("message", handler);
+        worker!.postMessage({
+          type: "bundleImagesAsZip",
+          id: "bundleImagesAsZip",
+          firmware: new Uint8Array(),
+        });
+      });
+
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const filename = `firmware_images_${timestamp}.zip`;
+
+      await fileIO.writeFile(filename, zipData);
+      statusMessage = `Images exported as ${filename}`;
+    } catch (err) {
+      showWarningDialog(
+        "Export Error",
+        `Failed to bundle images: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      isProcessing = false;
+    }
+  }
+
   // Show warning dialog
   function showWarningDialog(title: string, message: string) {
     warningTitle = title;
@@ -708,6 +779,23 @@
   // Trigger file input
   function triggerFileInput() {
     fileInput.click();
+  }
+
+  // Trigger edit file input for multiple file selection
+  function triggerEditFileInput() {
+    editFileInput.click();
+  }
+
+  // Handle edit file select (multiple files)
+  function handleEditFileSelect(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      handlePasteFiles(fileArray);
+    }
+    // Reset input so the same files can be selected again
+    target.value = '';
   }
 
   // Handle close button on resource viewer - reset and show file picker
@@ -786,6 +874,54 @@
         onclose={handleCloseResourceViewer}
       >
         <WindowBody>
+          <!-- Toolbar with icon buttons -->
+          <div class="toolbar">
+            <button
+              type="button"
+              class="toolbar-button"
+              title="Open Firmware (Ctrl+O)"
+              onclick={triggerFileInput}
+              disabled={!firmwareData}
+            >
+              <img src="/document-open.png" alt="" class="toolbar-icon" />
+            </button>
+            <button
+              type="button"
+              class="toolbar-button"
+              title="Save Firmware (Ctrl+S)"
+              onclick={exportFirmware}
+              disabled={!firmwareData || isProcessing}
+            >
+              <img src="/document-save.png" alt="" class="toolbar-icon" />
+            </button>
+            <button
+              type="button"
+              class="toolbar-button"
+              title="Download All Images as ZIP"
+              onclick={bundleImagesAsZip}
+              disabled={!firmwareData || isProcessing}
+            >
+              <img src="/document-export.png" alt="" class="toolbar-icon" />
+            </button>
+            <button
+              type="button"
+              class="toolbar-button"
+              title="Edit Images (Ctrl+V)"
+              onclick={triggerEditFileInput}
+              disabled={!firmwareData || isProcessing}
+            >
+              <img src="/document-edit.png" alt="" class="toolbar-icon" />
+            </button>
+            <input
+              type="file"
+              bind:this={editFileInput}
+              hidden
+              multiple
+              accept="image/*"
+              onchange={handleEditFileSelect}
+            />
+          </div>
+
           <div class="browser-layout">
             <!-- Tree View -->
             <div class="tree-panel">
@@ -972,6 +1108,58 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Toolbar styling */
+  .toolbar {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #808080;
+  }
+
+  .toolbar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 22px;
+    padding: 0;
+    border: 1px solid #ffffff;
+    border-right-color: #000000;
+    border-bottom-color: #000000;
+    background-color: #c0c0c0;
+    cursor: pointer;
+  }
+
+  .toolbar-button:active,
+  .toolbar-button:active:not(:disabled) {
+    border: 1px solid #000000;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+    padding: 1px 0 0 1px;
+  }
+
+  .toolbar-button:hover:not(:disabled) {
+    background-color: #dfdfdf;
+  }
+
+  .toolbar-button:focus {
+    outline: 1px dotted #000000;
+    outline-offset: -4px;
+  }
+
+  .toolbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .toolbar-icon {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
+    pointer-events: none;
   }
 
   .browser-layout {
