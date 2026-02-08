@@ -32,6 +32,7 @@ import {
 	parseMetadataTable,
 	detectOffsetMisalignment,
 	isPrintable,
+	buildBitmapListFromMetadata,
 	type MetadataEntry,
 	METADATA_ENTRY_SIZE,
 	ROCK26_ENTRY_SIZE,
@@ -459,91 +460,7 @@ export class ResourceExtractor {
 	 * @returns Array of bitmap file information
 	 */
 	listDirectory(): BitmapFileInfo[] {
-		// Get Part 5 data
-		const part5Offset = this.reader.readU32LE(0x14c);
-		const part5Size = this.reader.readU32LE(0x150);
-		const part5Data = this.firmware.slice(part5Offset, part5Offset + part5Size);
-
-		// Find metadata table
-		const tableStart = this.findMetadataTableInPart5();
-		if (tableStart === null) {
-			return [];
-		}
-
-		// Parse metadata table
-		const metadataEntries = this.parseMetadataTable(tableStart);
-
-		// Find ROCK26 table for misalignment detection
-		const rock26Offset = findBytes(part5Data, ROCK26_SIGNATURE);
-		if (rock26Offset === -1) {
-			return [];
-		}
-
-		// Detect misalignment
-		const { misalignment } = this.detectOffsetMisalignment(
-			metadataEntries,
-			part5Data,
-			rock26Offset
-		);
-
-		const files: BitmapFileInfo[] = [];
-		// When misalignment = 1, Entry 0 CAN still be extracted using Entry[1]'s offset
-		const startIndex = 0;
-		const endIndex = metadataEntries.length - (misalignment > 0 ? 1 : 0);
-
-		for (let i = startIndex; i < endIndex; i++) {
-			const entry = metadataEntries[i];
-
-			// Adjust offset based on misalignment
-			let offset: number;
-			if (misalignment > 0) {
-				const targetIndex = i + misalignment;
-				if (targetIndex >= metadataEntries.length) continue;
-				offset = metadataEntries[targetIndex].offset;
-			} else if (misalignment < 0) {
-				const targetIndex = i + misalignment;
-				if (targetIndex < 0) continue;
-				offset = metadataEntries[targetIndex].offset;
-			} else {
-				offset = entry.offset;
-			}
-
-			const name = entry.name;
-
-			// Get width/height from Entry[i+1] (Bootloader field reorganization)
-			let width: number;
-			let height: number;
-			if (i + 1 < metadataEntries.length) {
-				width = metadataEntries[i + 1].width;
-				height = metadataEntries[i + 1].height;
-			} else {
-				width = entry.width;
-				height = entry.height;
-			}
-
-			// Calculate size (RGB565 = 2 bytes per pixel)
-			const size = width * height * 2;
-
-			// Skip invalid entries
-			if (
-				offset === 0 ||
-				width <= 0 ||
-				height <= 0 ||
-				width > 10000 ||
-				height > 10000
-			) {
-				continue;
-			}
-
-			files.push({
-				name,
-				width,
-				height,
-				size
-			});
-		}
-
-		return files;
+		return buildBitmapListFromMetadata(this.firmware, false);
 	}
 
 	/**

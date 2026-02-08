@@ -10,8 +10,8 @@
  *   Flash Entry[i+1].height → runtime descriptor[i].height
  */
 
-import type { BitmapMetadata } from '../types/index.js';
-import { readU32LE } from './struct.js';
+import type { BitmapFileInfo } from '../types/index.js';
+import { readU32LE, findBytes } from './struct.js';
 
 // Constants
 export const METADATA_ENTRY_SIZE = 108;
@@ -267,4 +267,102 @@ export function detectOffsetMisalignment(
 			conclusion
 		}
 	};
+}
+
+/**
+ * Build list of bitmap files from firmware metadata
+ * Shared function used by both ResourceExtractor and firmware-worker
+ *
+ * @param firmwareData - Full firmware data
+ * @param includeOffset - Whether to include offset in results (default: false)
+ * @returns Array of bitmap file information
+ */
+export function buildBitmapListFromMetadata(
+	firmwareData: Uint8Array,
+	includeOffset = false
+): BitmapFileInfo[] {
+	// Extract Part 5 data
+	const part5Offset = readU32LE(firmwareData, 0x14c);
+	const part5Size = readU32LE(firmwareData, 0x150);
+	const part5Data = firmwareData.slice(part5Offset, part5Offset + part5Size);
+
+	// Find ROCK26 signature
+	const rock26Offset = findBytes(part5Data, ROCK26_SIGNATURE);
+	if (rock26Offset === -1) {
+		return [];
+	}
+
+	// Find metadata table using ROCK26 anchor
+	const tableStart = findMetadataTableByRock26Anchor(part5Data, rock26Offset);
+	if (tableStart === null) {
+		return [];
+	}
+
+	// Parse metadata entries
+	const metadataEntries = parseMetadataTable(part5Data, tableStart);
+
+	// Detect misalignment
+	const { misalignment } = detectOffsetMisalignment(
+		metadataEntries,
+		part5Data,
+		rock26Offset
+	);
+
+	const files: BitmapFileInfo[] = [];
+	// When misalignment = 1, Entry 0 CAN still be extracted using Entry[1]'s offset
+	const startIndex = 0;
+	const endIndex = metadataEntries.length - (misalignment > 0 ? 1 : 0);
+
+	for (let i = startIndex; i < endIndex; i++) {
+		const entry = metadataEntries[i];
+
+		// Adjust offset based on misalignment
+		let offset: number;
+		if (misalignment > 0) {
+			const targetIndex = i + misalignment;
+			if (targetIndex >= metadataEntries.length) continue;
+			offset = metadataEntries[targetIndex].offset;
+		} else if (misalignment < 0) {
+			const targetIndex = i + misalignment;
+			if (targetIndex < 0) continue;
+			offset = metadataEntries[targetIndex].offset;
+		} else {
+			offset = entry.offset;
+		}
+
+		// Get width/height from Entry[i+1] (Bootloader field reorganization)
+		let width: number;
+		let height: number;
+		if (i + 1 < metadataEntries.length) {
+			width = metadataEntries[i + 1].width;
+			height = metadataEntries[i + 1].height;
+		} else {
+			width = entry.width;
+			height = entry.height;
+		}
+
+		// Calculate size (RGB565 = 2 bytes per pixel)
+		const size = width * height * 2;
+
+		// Skip invalid entries
+		if (
+			offset === 0 ||
+			width <= 0 ||
+			height <= 0 ||
+			width > 10000 ||
+			height > 10000
+		) {
+			continue;
+		}
+
+		files.push({
+			name: entry.name,
+			width,
+			height,
+			size,
+			...(includeOffset && { offset })
+		});
+	}
+
+	return files;
 }

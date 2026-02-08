@@ -8,6 +8,7 @@ import {
 	findMetadataTableByRock26Anchor,
 	parseMetadataTable,
 	detectOffsetMisalignment,
+	buildBitmapListFromMetadata,
 	ROCK26_SIGNATURE
 } from '../rse/utils/metadata.js';
 import { validateBitmapData } from '../rse/utils/font-encoder.js';
@@ -615,84 +616,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 					return;
 				}
 
-				const images: BitmapFileInfo[] = [];
-
-				// Extract Part 5 data first (matches Python: part5_offset = img_data[0x14c:0x150])
-				const part5Offset = readU32LE(firmwareData, 0x14c);
-				const part5Size = readU32LE(firmwareData, 0x150);
-				const part5Data = firmwareData.slice(part5Offset, part5Offset + part5Size);
-
-				// Find ROCK26 table within Part 5
-				const rock26Offset = findBytes(part5Data, ROCK26_SIGNATURE);
-				if (rock26Offset === -1) {
-					self.postMessage({ type: 'success', id, result: images });
-					return;
-				}
-
-				// Find metadata table using ROCK26 anchor (within Part 5)
-				const tableStart = findMetadataTableByRock26Anchor(part5Data, rock26Offset);
-				if (tableStart === null) {
-					self.postMessage({ type: 'success', id, result: images });
-					return;
-				}
-
-				// Parse all metadata entries
-				const allEntries = parseMetadataTable(part5Data, tableStart);
-
-				// Detect misalignment using ROCK26 offsets
-				const { misalignment, firstValidEntry } = detectOffsetMisalignment(
-					allEntries,
-					part5Data,
-					rock26Offset
-				);
-
-				// Build image list with misalignment correction
-				// For each entry, use width/height from the NEXT entry (Python behavior)
-				const startIndex = firstValidEntry;
-				const endIndex = allEntries.length - (misalignment > 0 ? 1 : 0);
-
-				for (let i = startIndex; i < endIndex; i++) {
-					const entry = allEntries[i];
-
-					// Get width/height from next entry (or current if last entry)
-					let width: number;
-					let height: number;
-					if (i + 1 < allEntries.length) {
-						width = allEntries[i + 1].width;
-						height = allEntries[i + 1].height;
-					} else {
-						width = entry.width;
-						height = entry.height;
-					}
-
-					// Apply misalignment correction to offset
-					let offset: number;
-					if (misalignment > 0) {
-						const targetIndex = i + misalignment;
-						if (targetIndex >= allEntries.length) continue;
-						offset = allEntries[targetIndex].offset;
-					} else if (misalignment < 0) {
-						const targetIndex = i + misalignment;
-						if (targetIndex < 0) continue;
-						offset = allEntries[targetIndex].offset;
-					} else {
-						offset = entry.offset;
-					}
-
-					// Skip invalid entries
-					if (offset === 0 || width <= 0 || height <= 0 || width > 10000 || height > 10000) {
-						continue;
-					}
-
-					images.push({
-						name: entry.name,
-						width,
-						height,
-						size: width * height * 2,
-						offset
-					});
-				}
-
+				const images = buildBitmapListFromMetadata(firmwareData, true);
 				self.postMessage({ type: 'success', id, result: images });
 				break;
 			}
@@ -1010,78 +934,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 
 				self.postMessage({ type: 'progress', id, message: 'Collecting image list...' });
 
-				// Collect all images (similar to listImages)
-				const images: BitmapFileInfo[] = [];
+				// Extract Part 5 data for later use in ZIP processing
 				const part5Offset = readU32LE(firmwareData, 0x14c);
 				const part5Size = readU32LE(firmwareData, 0x150);
 				const part5Data = firmwareData.slice(part5Offset, part5Offset + part5Size);
 
-				// Find ROCK26 table within Part 5
-				const rock26Offset = findBytes(part5Data, ROCK26_SIGNATURE);
-				if (rock26Offset === -1) {
-					self.postMessage({ type: 'error', id, error: 'Could not find ROCK26 signature' });
-					return;
-				}
-
-				// Find metadata table
-				const tableStart = findMetadataTableByRock26Anchor(part5Data, rock26Offset);
-				if (tableStart === null) {
-					self.postMessage({ type: 'error', id, error: 'Could not find metadata table' });
-					return;
-				}
-
-				// Parse all metadata entries
-				const allEntries = parseMetadataTable(part5Data, tableStart);
-
-				// Detect misalignment
-				const { misalignment, firstValidEntry } = detectOffsetMisalignment(
-					allEntries,
-					part5Data,
-					rock26Offset
-				);
-
-				// Build image list
-				const startIndex = firstValidEntry;
-				const endIndex = allEntries.length - (misalignment > 0 ? 1 : 0);
-
-				for (let i = startIndex; i < endIndex; i++) {
-					const entry = allEntries[i];
-
-					let width: number;
-					let height: number;
-					if (i + 1 < allEntries.length) {
-						width = allEntries[i + 1].width;
-						height = allEntries[i + 1].height;
-					} else {
-						width = entry.width;
-						height = entry.height;
-					}
-
-					let offset: number;
-					if (misalignment > 0) {
-						const targetIndex = i + misalignment;
-						if (targetIndex >= allEntries.length) continue;
-						offset = allEntries[targetIndex].offset;
-					} else if (misalignment < 0) {
-						const targetIndex = i + misalignment;
-						if (targetIndex < 0) continue;
-						offset = allEntries[targetIndex].offset;
-					} else {
-						offset = entry.offset;
-					}
-
-					if (offset === 0 || width <= 0 || height <= 0 || width > 10000 || height > 10000) {
-						continue;
-					}
-
-					images.push({
-						name: entry.name,
-						width,
-						height,
-						size: width * height * 2,
-						offset
-					});
-				}
+				// Build image list using shared function
+				const images = buildBitmapListFromMetadata(firmwareData, true);
 
 				if (images.length === 0) {
 					self.postMessage({ type: 'error', id, error: 'No images found in firmware' });

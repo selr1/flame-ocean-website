@@ -292,4 +292,6 @@ export interface BitmapFileInfo {
 	readonly height: number;
 	/** Size in bytes */
 	readonly size: number;
+	/** Offset in firmware (optional, for extraction) */
+	readonly offset?: number;
 }

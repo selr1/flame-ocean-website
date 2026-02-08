@@ -13,28 +13,39 @@ import { UNICODE_RANGES } from '../utils/unicode-ranges.js';
 // Mock firmware data for testing
 function createMockFirmware(): Uint8Array {
 	const data = new Uint8Array(0x500000); // 5MB mock firmware
-
-	// Add ROCK26 signature
-	const rock26Sig = new TextEncoder().encode('ROCK26IMAGERES');
-	data.set(rock26Sig, 0x100000);
-
-	// Set up partition table at 0x80
-	// part_2_firmware_b offset and size
 	const view = new DataView(data.buffer);
-	view.setUint32(0x80, 0x100000, true); // offset
-	view.setUint32(0x84, 0x400000, true); // size
+
+	// Set up Part 5 header (required by ResourceExtractor)
+	const part5Offset = 0x100000;
+	const part5Size = 0x400000;
+	view.setUint32(0x14c, part5Offset, true); // Part 5 offset
+	view.setUint32(0x150, part5Size, true); // Part 5 size
+
+	// Add ROCK26 signature within Part 5
+	const rock26Sig = new TextEncoder().encode('ROCK26IMAGERES');
+	data.set(rock26Sig, part5Offset); // At 0x100000
+
+	// Set up partition table at 0x80 (legacy, for FirmwareAnalyzer)
+	view.setUint32(0x80, part5Offset, true); // offset
+	view.setUint32(0x84, part5Size, true); // size
 
 	// Set up SMALL_BASE at 0x78/0x7A
 	view.setUint16(0x78, 0x1234, true);
 	view.setUint16(0x7a, 0x0056, true);
 
-	// Add some metadata entries
-	const metadataOffset = 0x200000;
-	view.setUint32(metadataOffset + 20, 0x300000, true); // offset
-	view.setUint32(metadataOffset + 24, 100, true); // width
-	view.setUint32(metadataOffset + 28, 100, true); // height
+	// Add metadata entries within Part 5
+	// For simplicity, create entries that don't have the Bootloader field reorganization
+	// This is a mock firmware for testing, not a real firmware
+	const metadataOffsetInPart5 = 0x100000; // Relative to Part 5 start
+	const metadataOffsetFirmware = part5Offset + metadataOffsetInPart5; // 0x200000
+
+	// Entry 0: TEST.BMP (simple, valid entry for testing)
+	// Store offset as firmware-relative for test compatibility
+	view.setUint32(metadataOffsetFirmware + 20, 0x300000, true); // firmware-relative offset
+	view.setUint32(metadataOffsetFirmware + 24, 100, true); // width
+	view.setUint32(metadataOffsetFirmware + 28, 100, true); // height
 	const name = new TextEncoder().encode('TEST.BMP\x00');
-	data.set(name, metadataOffset + 32);
+	data.set(name, metadataOffsetFirmware + 32);
 
 	return data;
 }
