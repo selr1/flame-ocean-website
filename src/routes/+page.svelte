@@ -59,6 +59,9 @@
   let selectedNodeIds = $state(new Set<string>());
   let expandedNodes = $state(new Set<string>());
   let treeNodes = $state<TreeNode[]>([]);
+
+  // Track the last non-shift clicked node as anchor for range selection
+  let lastSelectionAnchor = $state<string | null>(null);
   
   // Derived state for multi-selection
   let selectedImages = $derived(
@@ -296,7 +299,7 @@
     ];
 
     // Auto-expand the font folders
-    expandedNodes = new Set(["fonts", "fonts-small", "fonts-large"]);
+    expandedNodes = new Set(["fonts", "fonts-small", "fonts-large", "images"]);
   }
 
   // Build image tree structure
@@ -324,6 +327,9 @@
     } else {
       treeNodes = [...treeNodes, imagesNode];
     }
+
+    // Ensure images folder is expanded so images are visible for range selection
+    expandedNodes = new Set([...expandedNodes, "images"]);
   }
 
   // Handle tree node click
@@ -381,36 +387,45 @@
       const ctrlKey = e.ctrlKey || e.metaKey;
       const shiftKey = e.shiftKey;
 
-      if (shiftKey && selectedNodeIds.size > 0) {
-        // Range selection
+      // Prevent default browser text selection on shift+click
+      if (shiftKey) {
+        e.preventDefault();
+      }
+
+      if (shiftKey && lastSelectionAnchor) {
+        // Range selection: select from anchor to current node
         const visibleNodes = getVisibleNodes(treeNodes, expandedNodes);
-        const lastSelectedId = Array.from(selectedNodeIds).pop();
-        const startIdx = visibleNodes.findIndex(n => n.id === lastSelectedId);
+        const startIdx = visibleNodes.findIndex(n => n.id === lastSelectionAnchor);
         const endIdx = visibleNodes.findIndex(n => n.id === nodeId);
-        
+
         if (startIdx !== -1 && endIdx !== -1) {
           const [min, max] = [Math.min(startIdx, endIdx), Math.max(startIdx, endIdx)];
           const range = visibleNodes.slice(min, max + 1).map(n => n.id);
-          const newSet = new Set(selectedNodeIds);
-           range.forEach(id => newSet.add(id));
-           selectedNodeIds = newSet;
+          selectedNodeIds = new Set(range);
         }
       } else if (ctrlKey) {
         // Toggle selection
         const newSet = new Set(selectedNodeIds);
         if (newSet.has(nodeId)) {
           newSet.delete(nodeId);
+          // Update anchor if we deselected the current anchor
+          if (lastSelectionAnchor === nodeId) {
+            lastSelectionAnchor = newSet.size > 0 ? Array.from(newSet).pop()! : null;
+          }
         } else {
           newSet.add(nodeId);
+          lastSelectionAnchor = nodeId;
         }
         selectedNodeIds = newSet;
       } else {
         // Single selection
         selectedNodeIds = new Set([nodeId]);
+        lastSelectionAnchor = nodeId;
       }
     } else {
         // Fallback for programmatic or basic selection
         selectedNodeIds = new Set([nodeId]);
+        lastSelectionAnchor = nodeId;
     }
 
     // Update main view based on selection

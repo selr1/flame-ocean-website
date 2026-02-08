@@ -147,6 +147,8 @@
 	.tree-view {
 		max-height: 100%;
 		overflow-y: auto;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
 	.leaf-node {
