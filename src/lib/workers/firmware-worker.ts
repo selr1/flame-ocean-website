@@ -22,20 +22,6 @@ const LARGE_STRIDE = 33;
 const FOOTER_SIGNATURES = new Set([0x90, 0x8f, 0x89, 0x8b, 0x8d, 0x8e, 0x8c]);
 const INVALID_VALUES = new Set([0x00, 0xff]);
 
-/**
- * Swap odd and even bytes to convert between big-endian and little-endian.
- * Firmware stores RGB565 data in big-endian format, but we need little-endian.
- */
-function swapBytes16Bit(data: Uint8Array): Uint8Array {
-	const result = new Uint8Array(data.length);
-	for (let i = 0; i < data.length; i += 2) {
-		// Swap adjacent bytes: [lo, hi] -> [hi, lo]
-		result[i] = data[i + 1];
-		result[i + 1] = data[i];
-	}
-	return result;
-}
-
 // Worker message types
 interface WorkerRequest {
 	type: 'analyze' | 'listPlanes' | 'listImages' | 'extractPlane' | 'extractImage' | 'replaceImage' | 'replaceImages' | 'getFirmware' | 'bundleImagesAsZip';
@@ -635,9 +621,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 				const part5Data = firmwareData.slice(part5Offset, part5Offset + part5Size);
 
 				const rawSize = width * height * 2;
-				// Firmware stores RGB565 in big-endian, convert to little-endian
-				const rawRgb565 = part5Data.slice(offset, offset + rawSize);
-				const rgb565Data = swapBytes16Bit(rawRgb565);
+				// Firmware stores RGB565 in big-endian format (hardware requirement)
+				const rgb565Data = part5Data.slice(offset, offset + rawSize);
 
 				self.postMessage({
 					type: 'success',
@@ -731,16 +716,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 					return;
 				}
 
-				// Convert to little-endian for display
-				const rgb565DataLE = swapBytes16Bit(rgb565Data);
-
 				self.postMessage({
 					type: 'success',
 					id,
 					result: {
 						success: true,
 						imageName: imageName,
-						rgb565Data: rgb565DataLE
+						rgb565Data
 					} as ReplaceImageResult
 				});
 				break;
@@ -821,9 +803,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
 						continue;
 					}
 
-					// Convert to little-endian for display
-					const rgb565DataLE = swapBytes16Bit(rgb565Data);
-					results.push({ imageName, rgb565Data: rgb565DataLE });
+					results.push({ imageName, rgb565Data });
 					successCount++;
 				}
 

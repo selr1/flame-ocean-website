@@ -53,7 +53,8 @@
 		for (let y = 0; y < height; y++) {
 			for (let x = 0; x < width; x++) {
 				const offset = (y * width + x) * 2;
-				const pixel = rgb565Data[offset] | (rgb565Data[offset + 1] << 8);
+				// Read big-endian RGB565: high byte first, then low byte
+				const pixel = (rgb565Data[offset] << 8) | rgb565Data[offset + 1];
 				const { r, g, b } = rgb565ToRgb888(pixel);
 
 				ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
