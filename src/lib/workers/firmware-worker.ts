@@ -4,22 +4,23 @@
  */
 
 // Import shared metadata utilities
-import { buildBitmapListFromMetadata } from "../rse/utils/metadata.js";
-import { validateBitmapData } from "../rse/utils/font-encoder";
-import { convertToBmp, isValidFontData } from "../rse/utils/bitmap";
+import JSZip from "jszip";
+
 import {
   decodeV8,
   isDataEmpty,
   sliceSmallFontPixels,
 } from "../rse/utils/font-decoder";
 import { type PixelData } from "../rse/types";
-import JSZip from "jszip";
+import { validateBitmapData } from "../rse/utils/font-encoder";
+import { buildBitmapListFromMetadata } from "../rse/utils/metadata.js";
+import { convertToBmp, isValidFontData } from "../rse/utils/bitmap";
 
 // Constants
 const SMALL_STRIDE = 32;
 const LARGE_STRIDE = 33;
-const FOOTER_SIGNATURES = new Set([0x90, 0x8f, 0x89, 0x8b, 0x8d, 0x8e, 0x8c]);
 const INVALID_VALUES = new Set([0x00, 0xff]);
+const FOOTER_SIGNATURES = new Set([0x90, 0x8f, 0x89, 0x8b, 0x8d, 0x8e, 0x8c]);
 
 // Worker message types
 interface WorkerRequest {
