@@ -5,15 +5,12 @@
 
 // Import shared metadata utilities
 import {
-	findMetadataTableByRock26Anchor,
-	parseMetadataTable,
-	detectOffsetMisalignment,
 	buildBitmapListFromMetadata,
-	ROCK26_SIGNATURE
 } from '../rse/utils/metadata.js';
-import { validateBitmapData } from '../rse/utils/font-encoder.js';
-import { convertToBmp, isValidFontData } from '../rse/utils/bitmap.js';
-import { decodeV8, isDataEmpty, sliceSmallFontPixels } from '../rse/utils/font-decoder.js';
+import { validateBitmapData } from '../rse/utils/font-encoder';
+import { convertToBmp, isValidFontData } from '../rse/utils/bitmap';
+import { decodeV8, isDataEmpty, sliceSmallFontPixels } from '../rse/utils/font-decoder';
+import  { type PixelData } from '../rse/types';
 import JSZip from 'jszip';
 
 // Constants
@@ -69,7 +66,7 @@ interface PlaneData {
 	fonts: Array<{
 		unicode: number;
 		fontType: 'SMALL' | 'LARGE';
-		pixels: boolean[][];
+		pixels: PixelData;
 	}>;
 }
 
