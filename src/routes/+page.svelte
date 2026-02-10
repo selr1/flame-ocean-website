@@ -679,9 +679,7 @@
       // Update the main thread's firmware data with the modified version
       firmwareData = modifiedFirmware;
 
-      const now = new Date();
-      const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, -5);
-      const filename = `firmware_modified_${timestamp}.bin`;
+      const filename = "HIFIEC10.IMG";
 
       await fileIO.writeFile(filename, firmwareData);
       statusMessage = `Firmware exported as ${filename}`;
